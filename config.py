@@ -1,4 +1,5 @@
-# Instagram Bot Configuration
+import os# Instagram Bot Configuration
+
 # Foydalanuvchi ma'lumotlari
 
 # =============================================
