@@ -4,21 +4,19 @@
 # =============================================
 # 🔐 INSTAGRAM LOGIN MA'LUMOTLARI
 # =============================================
-INSTAGRAM_USERNAME = "the.makkiy"
-INSTAGRAM_PASSWORD = "Abdulloh0101"
+from dotenv import load_dotenv
+load_dotenv()
+
+INSTAGRAM_USERNAME = os.environ.get("INSTAGRAM_USERNAME")
+INSTAGRAM_PASSWORD = os.environ.get("INSTAGRAM_PASSWORD")
 
 # =============================================
 # 🎯 TARGET MANBA (Kimlarni follow qilish)
 # =============================================
-TARGET_ACCOUNT = "muhibulloh_"  # Bu akkauntning followerlarini follow qiladi
-
-# Hashtag bo'yicha (ixtiyoriy, bo'sh qoldiring agar kerak bo'lmasa)
+TARGET_ACCOUNT = os.environ.get("TARGET_ACCOUNT", "muhibulloh_")  # Default bo'lishi mumkin
 TARGET_HASHTAG = ""
 
-# =============================================
-# 🌙 TUNGI DAM OLISH VAQTI
-# =============================================
-# Bot 00:00 dan 07:00 gacha ishlamaydi
+# ...
 NIGHT_REST_START = 0   # Soat 00:00
 NIGHT_REST_END = 7     # Soat 07:00
 

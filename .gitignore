@@ -6,3 +6,4 @@ browser_data/SingletonSocket
 error_nav.png
 debug_followers_dialog.png
 *.log
+.env
