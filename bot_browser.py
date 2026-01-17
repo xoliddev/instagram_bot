@@ -149,7 +149,6 @@ class InstagramBrowserBot:
                 headless=config.HEADLESS,  # Configdan o'qish
                 args=["--no-sandbox", "--disable-setuid-sandbox"] if config.HEADLESS else [],
                 viewport={"width": 1280, "height": 800},
-                viewport={"width": 1280, "height": 800},
                 locale="en-US"
             )
             
