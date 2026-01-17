@@ -288,31 +288,33 @@ class InstagramBrowserBot:
                     except:
                         continue
                 
-                # Scroll - JS usuli (ishonchliroq)
+                # Scroll - Mouse Wheel usuli (Eng ishonchli)
                 try:
-                    # Scroll bo'ladigan elementni topish (Instagramda odatda _aano klassi)
-                    scrollable = dialog.locator('div._aano').first
-                    if not scrollable.is_visible():
-                         # Yoki overflow bor elementni qidirish
-                         scrollable = dialog.locator('div[style*="overflow"]').first
-                    
-                    if scrollable.is_visible():
-                        # Pastga scroll qilish
-                        scrollable.evaluate("el => el.scrollTop = el.scrollHeight")
-                    else:
-                        # Fallback: Dialogning o'zini scroll qilish
-                        dialog.evaluate("el => el.scrollTop += 1000")
+                    # 1. Dialog markazini topish
+                    box = dialog.bounding_box()
+                    if box:
+                        # Sichqonchani o'rtaga olib borish
+                        self.page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
                         
-                    logger.info("📜 Scroll qilindi...")
-                    time.sleep(2) # Loading uchun kutish
+                        # G'ildirakni aylantirish
+                        self.page.mouse.wheel(0, 5000)
+                        logger.info("🖱️ Mouse wheel ishlatildi...")
+                    else:
+                        # Fallback: JS orqali barcha divlarni scroll qilish
+                        dialog.evaluate("""element => {
+                            const divs = element.querySelectorAll('div');
+                            divs.forEach(div => {
+                                if (div.scrollHeight > div.clientHeight) {
+                                    div.scrollTop += 1000;
+                                }
+                            });
+                        }""")
+                        logger.info("📜 JS Universal Scroll ishlatildi...")
+                        
+                    time.sleep(3) # Loading...
+                    
                 except Exception as e:
                     logger.warning(f"⚠️ Scroll xatosi: {e}")
-                    # Keyboard fallback
-                    try:
-                        dialog.click()
-                        self.page.keyboard.press("PageDown")
-                    except:
-                        pass
                 
                 scroll_count += 1
             
