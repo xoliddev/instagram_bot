@@ -610,6 +610,35 @@ def main():
             bot.close()
             return
     
+    # 🤖 Serverda avtomatik ishga tushish (Menyusiz)
+    if config.HEADLESS:
+        logger.info("🤖 Server rejimi aniqlandi: 24/7 Avtomatik rejim ishga tushmoqda...")
+        print(f"\n{Fore.YELLOW}🤖 AVTOMATIK REJIM (24/7) - Server")
+        
+        try:
+            while True:
+                if bot.is_night_time():
+                    bot.wait_until_morning()
+                
+                # 1. Follow sikli
+                bot.run_follow_cycle(20)
+                bot.show_stats()
+                
+                # 2. Unfollow sikli (24 soat o'tganlarni)
+                bot.check_and_unfollow()
+                bot.show_stats()
+                
+                # 3. Kutish (1 soat)
+                logger.info("⏳ Sikl tugadi. 1 soat kutilmoqda...")
+                time.sleep(3600)
+                
+        except KeyboardInterrupt:
+            logger.info("⚠️ To'xtatildi")
+        finally:
+            bot.close()
+        return
+
+    # 🖥️ Lokal kompyuterda menyu chiqarish
     try:
         while True:
             print(f"""
