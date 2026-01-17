@@ -1,0 +1,63 @@
+# Instagram Bot Configuration
+# Foydalanuvchi ma'lumotlari
+
+# =============================================
+# 🔐 INSTAGRAM LOGIN MA'LUMOTLARI
+# =============================================
+INSTAGRAM_USERNAME = "the.makkiy"
+INSTAGRAM_PASSWORD = "Abdulloh0101"
+
+# =============================================
+# 🎯 TARGET MANBA (Kimlarni follow qilish)
+# =============================================
+TARGET_ACCOUNT = "muhibulloh_"  # Bu akkauntning followerlarini follow qiladi
+
+# Hashtag bo'yicha (ixtiyoriy, bo'sh qoldiring agar kerak bo'lmasa)
+TARGET_HASHTAG = ""
+
+# =============================================
+# 🌙 TUNGI DAM OLISH VAQTI
+# =============================================
+# Bot 00:00 dan 07:00 gacha ishlamaydi
+NIGHT_REST_START = 0   # Soat 00:00
+NIGHT_REST_END = 7     # Soat 07:00
+
+# =============================================
+# ⏱️ INSONIY VAQT ORALIG'I (sekundda)
+# =============================================
+# Follow orasidagi vaqt (real odam kabi - 2-5 daqiqa)
+FOLLOW_DELAY_MIN = 120   # 2 daqiqa
+FOLLOW_DELAY_MAX = 300   # 5 daqiqa
+
+# Unfollow orasidagi vaqt (real odam kabi - 2-5 daqiqa)
+UNFOLLOW_DELAY_MIN = 120  # 2 daqiqa
+UNFOLLOW_DELAY_MAX = 300  # 5 daqiqa
+
+# Tekshirish orasidagi vaqt (24 soat = 86400 sekund)
+CHECK_INTERVAL = 86400  # 24 soat
+
+# =============================================
+# 📊 LIMITLAR (Kunlik - xavfsiz miqdor)
+# =============================================
+DAILY_FOLLOW_LIMIT = 80     # Kuniga maksimum follow
+DAILY_UNFOLLOW_LIMIT = 80   # Kuniga maksimum unfollow
+
+# =============================================
+# 📁 FAYL NOMLARI
+# =============================================
+SESSION_FILE = "session.json"           # Session saqlash
+FOLLOWING_DB = "following_data.json"    # Follow qilinganlar ro'yxati (baza)
+LOG_FILE = "bot.log"                    # Log fayli
+
+# =============================================
+# 🖥️ SERVER SOZLAMALARI
+# =============================================
+import os
+
+# ...
+
+# =============================================
+# 🖥️ SERVER SOZLAMALARI
+# =============================================
+# Agar serverda bo'lsa (HEADLESS env vari bor bo'lsa), o'shani oladi. Yo'qsa False.
+HEADLESS = os.environ.get("HEADLESS", "False").lower() == "true"

@@ -1,0 +1,63 @@
+{
+  "following": {
+    "sarvi.2728": {
+      "username": "sarvi.2728",
+      "followed_at": "2026-01-17T23:02:19.275154",
+      "status": "waiting",
+      "checked": false
+    },
+    "__xusan__0708": {
+      "username": "__xusan__0708",
+      "followed_at": "2026-01-17T23:03:53.483399",
+      "status": "waiting",
+      "checked": false
+    },
+    "beek._o23": {
+      "username": "beek._o23",
+      "followed_at": "2026-01-17T23:06:46.697051",
+      "status": "waiting",
+      "checked": false
+    },
+    "umidjon.x88": {
+      "username": "umidjon.x88",
+      "followed_at": "2026-01-17T23:09:39.511387",
+      "status": "waiting",
+      "checked": false
+    },
+    "t_sardor_jr": {
+      "username": "t_sardor_jr",
+      "followed_at": "2026-01-17T23:12:51.500618",
+      "status": "waiting",
+      "checked": false
+    },
+    "assyem17": {
+      "username": "assyem17",
+      "followed_at": "2026-01-17T23:17:42.947899",
+      "status": "waiting",
+      "checked": false
+    },
+    "inshalloh1775": {
+      "username": "inshalloh1775",
+      "followed_at": "2026-01-17T23:19:43.295523",
+      "status": "waiting",
+      "checked": false
+    },
+    "makh.mudovv.7": {
+      "username": "makh.mudovv.7",
+      "followed_at": "2026-01-17T23:22:21.142172",
+      "status": "waiting",
+      "checked": false
+    },
+    "_jonibek__o2o": {
+      "username": "_jonibek__o2o",
+      "followed_at": "2026-01-17T23:26:11.846246",
+      "status": "waiting",
+      "checked": false
+    }
+  },
+  "stats": {
+    "total_followed": 9,
+    "total_unfollowed": 0,
+    "followed_back": 0
+  }
+}
