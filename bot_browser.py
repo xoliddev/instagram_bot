@@ -149,8 +149,31 @@ class InstagramBrowserBot:
                 headless=config.HEADLESS,  # Configdan o'qish
                 args=["--no-sandbox", "--disable-setuid-sandbox"] if config.HEADLESS else [],
                 viewport={"width": 1280, "height": 800},
+                viewport={"width": 1280, "height": 800},
                 locale="en-US"
             )
+            
+            # 🍪 Cookie'larni yuklash (Koyeb uchun)
+            cookie_file = Path("playwright_cookies.json")
+            if cookie_file.exists():
+                try:
+                    with open(cookie_file, 'r', encoding='utf-8') as f:
+                        cookies = json.load(f)
+                        self.context.add_cookies(cookies)
+                        logger.info(f"🍪 {len(cookies)} ta cookie yuklandi")
+                except Exception as e:
+                    logger.error(f"❌ Cookie yuklash xatosi: {e}")
+            
+            # 🍪 Cookie'larni yuklash (Koyeb uchun)
+            cookie_file = Path("playwright_cookies.json")
+            if cookie_file.exists():
+                try:
+                    with open(cookie_file, 'r', encoding='utf-8') as f:
+                        cookies = json.load(f)
+                        self.context.add_cookies(cookies)
+                        logger.info(f"🍪 {len(cookies)} ta cookie yuklandi")
+                except Exception as e:
+                    logger.error(f"❌ Cookie yuklash xatosi: {e}")
             
             self.page = self.context.new_page()
             logger.info("✅ Brauzer tayyor")
@@ -570,8 +593,19 @@ def main():
     
     if not bot.login():
         print(f"{Fore.YELLOW}⚠️ Login muvaffaqiyatsiz.")
+        if config.HEADLESS:
+             logger.error("❌ Headless rejimda login qilib bo'lmadi. Dastur to'xtatildi.")
+             bot.close()
+             return
+        
         print(f"{Fore.WHITE}   Brauzerda qo'lda login qiling va qayta urinib ko'ring.")
-        input("Login qilganingizdan keyin ENTER bosing...")
+        # Serverda input() ishlatilmaydi
+        if not config.HEADLESS:
+            try:
+                input("Login qilganingizdan keyin ENTER bosing...")
+            except:
+                pass
+            
         if not bot._is_logged_in():
             print(f"{Fore.RED}❌ Hali ham login bo'lmagan. Dastur tugatildi.")
             bot.close()
