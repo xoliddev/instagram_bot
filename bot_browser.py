@@ -288,15 +288,31 @@ class InstagramBrowserBot:
                     except:
                         continue
                 
-                # Scroll - keyboard usuli
+                # Scroll - JS usuli (ishonchliroq)
                 try:
-                    # Dialogga focus berib PageDown bosish
-                    dialog.click()
-                    self.page.keyboard.press("PageDown")
-                    time.sleep(1)
-                    self.page.keyboard.press("PageDown")
-                except:
-                    dialog.evaluate("el => el.scrollTop += 500")
+                    # Scroll bo'ladigan elementni topish (Instagramda odatda _aano klassi)
+                    scrollable = dialog.locator('div._aano').first
+                    if not scrollable.is_visible():
+                         # Yoki overflow bor elementni qidirish
+                         scrollable = dialog.locator('div[style*="overflow"]').first
+                    
+                    if scrollable.is_visible():
+                        # Pastga scroll qilish
+                        scrollable.evaluate("el => el.scrollTop = el.scrollHeight")
+                    else:
+                        # Fallback: Dialogning o'zini scroll qilish
+                        dialog.evaluate("el => el.scrollTop += 1000")
+                        
+                    logger.info("📜 Scroll qilindi...")
+                    time.sleep(2) # Loading uchun kutish
+                except Exception as e:
+                    logger.warning(f"⚠️ Scroll xatosi: {e}")
+                    # Keyboard fallback
+                    try:
+                        dialog.click()
+                        self.page.keyboard.press("PageDown")
+                    except:
+                        pass
                 
                 scroll_count += 1
             
