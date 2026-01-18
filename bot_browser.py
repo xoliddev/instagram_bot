@@ -183,17 +183,23 @@ class InstagramBrowserBot:
         try:
             # Target profilga o'tish
             self.page.goto(f"https://www.instagram.com/{target}/", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(3)
+            time.sleep(5)  # Server sekin - ko'proq kutish
             
             # Followers tugmasini bosish
             followers_btn = self.page.locator('a[href$="/followers/"]').first
             followers_btn.click()
-            time.sleep(3)
+            time.sleep(5)  # Server sekin - ko'proq kutish
             
             # Dialog ochilganini kutish
             dialog = self.page.locator('div[role="dialog"]').first
-            dialog.wait_for(timeout=10000)
-            time.sleep(2)
+            dialog.wait_for(timeout=30000)  # 30 sek timeout
+            time.sleep(5)  # Content yuklanishi uchun ko'proq vaqt
+            
+            # PageDown bilan dastlabki scroll (content yuklash uchun)
+            for _ in range(3):
+                self.page.keyboard.press("PageDown")
+                time.sleep(0.5)
+            time.sleep(3)
             
             collected = set()
             scroll_count = 0
@@ -314,13 +320,23 @@ class InstagramBrowserBot:
         try:
             # Target profilga o'tish
             self.page.goto(f"https://www.instagram.com/{target}/", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(3)
+            time.sleep(5)  # Server sekin - ko'proq kutish
             
             # Followers tugmasini bosish
             followers_link = self.page.locator('a[href$="/followers/"]').first
             followers_link.click()
-            time.sleep(5)
-            self.page.screenshot(path="debug_followers_dialog.png")
+            time.sleep(5)  # Server sekin - ko'proq kutish
+            
+            # Dialog ochilishini kutish
+            dialog = self.page.locator('div[role="dialog"]').first
+            dialog.wait_for(timeout=30000)
+            time.sleep(5)  # Content yuklanishi uchun
+            
+            # PageDown bilan dastlabki scroll (content yuklash uchun)
+            for _ in range(3):
+                self.page.keyboard.press("PageDown")
+                time.sleep(0.5)
+            time.sleep(3)
             
             # Deep Scroll Logic
             users = []
@@ -336,7 +352,7 @@ class InstagramBrowserBot:
                 
                 # Dialog content yuklanishini kutish
                 if scroll_count == 0:
-                    time.sleep(2)  # Dastlabki yuklanish uchun
+                    time.sleep(3)  # Dastlabki yuklanish uchun
                 
                 # Barcha linklar (avvalgi ishlaydigan usul)
                 follower_links = dialog.locator('a')
