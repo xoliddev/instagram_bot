@@ -14,4 +14,4 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 ENV HEADLESS=True
 
-CMD ["python", "bot_browser.py"]
+CMD ["python", "start.py"]
