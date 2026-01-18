@@ -401,6 +401,128 @@ class InstagramBrowserBot:
                 logger.info(f"⏳ {delay} sekund kutilmoqda...")
                 time.sleep(delay)
     
+    def get_my_following(self) -> set:
+        """Biz follow qilgan odamlarni olish (Following list)"""
+        logger.info("📋 Following ro'yxati olinmoqda...")
+        try:
+            # O'z profilga o'tish
+            self.page.goto(f"https://www.instagram.com/{config.INSTAGRAM_USERNAME}/", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(3)
+            
+            # Following tugmasini bosish
+            following_link = self.page.locator('a[href$="/following/"]').first
+            following_link.click()
+            time.sleep(3)
+            
+            following = set()
+            scroll_count = 0
+            prev_count = 0
+            
+            while scroll_count < 50:  # Max 50 scroll
+                following_links = self.page.locator('div[role="dialog"] a[href^="/"]')
+                
+                for i in range(following_links.count()):
+                    try:
+                        href = following_links.nth(i).get_attribute("href")
+                        if href and href.startswith("/"):
+                            username = href.strip("/").split("/")[0]
+                            if username and username != config.INSTAGRAM_USERNAME:
+                                following.add(username)
+                    except:
+                        continue
+                
+                # Scroll
+                try:
+                    self.page.mouse.wheel(0, 3000)
+                    time.sleep(1)
+                except:
+                    pass
+                
+                scroll_count += 1
+                if len(following) == prev_count:
+                    break
+                prev_count = len(following)
+            
+            self.page.keyboard.press("Escape")
+            time.sleep(1)
+            
+            logger.info(f"✅ {len(following)} ta following topildi")
+            return following
+            
+        except Exception as e:
+            logger.error(f"❌ Following olishda xato: {e}")
+            return set()
+    
+    def cleanup_following(self) -> dict:
+        """
+        To'liq Following tozalash - 
+        Sizga follow qilmagan barcha odamlarni unfollow qilish
+        """
+        logger.info(f"\n{'='*50}")
+        logger.info("🧹 FOLLOWING CLEANUP BOSHLANDI")
+        logger.info(f"{'='*50}\n")
+        
+        result = {
+            "following_count": 0,
+            "followers_count": 0,
+            "non_followers": 0,
+            "unfollowed": 0,
+            "errors": 0
+        }
+        
+        # 1. Following ro'yxatini olish
+        my_following = self.get_my_following()
+        result["following_count"] = len(my_following)
+        
+        if not my_following:
+            logger.warning("⚠️ Following bo'sh yoki olib bo'lmadi")
+            return result
+        
+        # 2. Followers ro'yxatini olish
+        my_followers = self.get_my_followers()
+        result["followers_count"] = len(my_followers)
+        
+        # 3. Sizga follow qilmaganlarni topish
+        non_followers = my_following - my_followers
+        result["non_followers"] = len(non_followers)
+        
+        logger.info(f"\n📊 Natija:")
+        logger.info(f"   Following: {len(my_following)}")
+        logger.info(f"   Followers: {len(my_followers)}")
+        logger.info(f"   👎 Non-followers: {len(non_followers)}")
+        
+        if not non_followers:
+            logger.info("✅ Barcha following sizga ham follow qilgan!")
+            return result
+        
+        # 4. Unfollow qilish (limit bilan)
+        logger.info(f"\n🚫 {len(non_followers)} ta odamni unfollow qilinmoqda...")
+        
+        unfollowed = 0
+        for username in list(non_followers)[:config.DAILY_UNFOLLOW_LIMIT]:
+            _, daily_unfollow = database.get_today_stats()
+            if daily_unfollow >= config.DAILY_UNFOLLOW_LIMIT:
+                logger.warning("⚠️ Kunlik unfollow limiti tugadi")
+                break
+            
+            try:
+                if self.unfollow_user(username):
+                    unfollowed += 1
+                    result["unfollowed"] += 1
+                    
+                    delay = self.get_human_delay(config.UNFOLLOW_DELAY_MIN, config.UNFOLLOW_DELAY_MAX)
+                    logger.info(f"⏳ {delay} sekund kutilmoqda...")
+                    time.sleep(delay)
+            except Exception as e:
+                logger.error(f"❌ @{username} unfollow xatosi: {e}")
+                result["errors"] += 1
+        
+        logger.info(f"\n{'='*50}")
+        logger.info(f"✅ CLEANUP TUGADI: {unfollowed} ta unfollow qilindi")
+        logger.info(f"{'='*50}\n")
+        
+        return result
+    
     def unfollow_user(self, username: str) -> bool:
         """Foydalanuvchini unfollow qilish"""
         
