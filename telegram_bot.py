@@ -349,6 +349,60 @@ async def cmd_cleanup(message: Message):
     await message.answer("🧹 Following tozalash sikli boshlanmoqda...\n\n<i>Sizga follow qilmaganlar unfollow qilinadi.</i>")
     state.current_cycle = "cleanup"
 
+@router.message(Command("collect"))
+async def cmd_collect(message: Message):
+    """Followerlarni bazaga to'plash"""
+    if not is_admin(message.from_user.id):
+        return
+    
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer("❌ Foydalanish: /collect @username [son]\n\nMisol: /collect @muhibulloh_ 5000")
+        return
+    
+    target = args[1].strip().lstrip("@")
+    count = 1000  # Default
+    if len(args) > 2 and args[2].isdigit():
+        count = min(int(args[2]), 10000)  # Max 10k
+    
+    pending_count = database.get_pending_count()
+    
+    await message.answer(f"""📥 <b>Follower to'plash boshlanmoqda...</b>
+
+🎯 Target: @{target}
+📊 Maqsad: {count} ta
+📋 Hozirgi pending: {pending_count} ta
+
+<i>Bu jarayon bir necha daqiqa olishi mumkin...</i>
+<i>Progress Koyeb loglarida ko'rinadi.</i>""")
+    
+    state.current_cycle = "collect"
+
+@router.message(Command("pending"))
+async def cmd_pending(message: Message):
+    """Pending userlar (to'plangan, hali follow qilinmagan)"""
+    if not is_admin(message.from_user.id):
+        return
+    
+    pending_count = database.get_pending_count()
+    pending_users = database.get_pending_users(10)  # Faqat 10 ta ko'rsatish
+    
+    if pending_count == 0:
+        await message.answer("📋 Pending userlar yo'q.\n\nYangi to'plash uchun: /collect @username 1000")
+        return
+    
+    text = f"📋 <b>Pending userlar:</b> {pending_count} ta\n\n"
+    
+    for i, username in enumerate(pending_users, 1):
+        text += f"{i}. @{username}\n"
+    
+    if pending_count > 10:
+        text += f"\n<i>... va yana {pending_count - 10} ta</i>"
+    
+    text += "\n\n💡 <i>Bu userlar keyingi follow siklda follow qilinadi.</i>"
+    
+    await message.answer(text)
+
 @router.message(Command("non_followers"))
 async def cmd_non_followers(message: Message):
     """Sizga follow qilmaganlar ro'yxati"""

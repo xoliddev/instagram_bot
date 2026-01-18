@@ -45,7 +45,7 @@ def init_db():
         logger.error(f"❌ Baza yaratish xatosi: {e}")
 
 def add_user(username):
-    """Yangi userni qo'shish"""
+    """Yangi userni qo'shish (follow qilinganda)"""
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
@@ -68,6 +68,49 @@ def add_user(username):
     except Exception as e:
         logger.error(f"❌ DB Add user error: {e}")
         return False
+
+def add_pending_user(username, source_target=None):
+    """Pending user qo'shish (hali follow qilinmagan, to'plangan)"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now()
+            cursor.execute("""
+                INSERT OR IGNORE INTO users (username, status, followed_at, checked)
+                VALUES (?, 'pending', NULL, 0)
+            """, (username,))
+            conn.commit()
+            return cursor.rowcount > 0  # True if actually inserted
+    except Exception as e:
+        logger.error(f"❌ DB Add pending user error: {e}")
+        return False
+
+def get_pending_users(count=20):
+    """Pending statusdagi userlarni olish (follow qilish uchun)"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT username FROM users 
+                WHERE status = 'pending' 
+                ORDER BY ROWID ASC 
+                LIMIT ?
+            """, (count,))
+            return [row['username'] for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"❌ DB Get pending users error: {e}")
+        return []
+
+def get_pending_count():
+    """Pending statusdagi userlar soni"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE status = 'pending'")
+            return cursor.fetchone()['cnt']
+    except Exception as e:
+        logger.error(f"❌ DB Get pending count error: {e}")
+        return 0
 
 def get_user(username):
     """User borligini tekshirish"""

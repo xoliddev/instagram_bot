@@ -160,6 +160,141 @@ class InstagramBrowserBot:
             logger.error(f"❌ Login xatosi: {e}")
             return False
     
+    def collect_followers(self, target: str, max_count: int = 1000) -> dict:
+        """
+        Target followerlarini bazaga to'plash (pending status bilan)
+        Max 10,000 ta
+        """
+        max_count = min(max_count, 10000)  # Maximum 10k
+        
+        logger.info(f"\n{'='*50}")
+        logger.info(f"📥 FOLLOWER TO'PLASH BOSHLANDI: @{target}")
+        logger.info(f"🎯 Maqsad: {max_count} ta follower")
+        logger.info(f"{'='*50}\n")
+        
+        result = {
+            "target": target,
+            "total_found": 0,
+            "new_added": 0,
+            "already_in_db": 0,
+            "errors": 0
+        }
+        
+        try:
+            # Target profilga o'tish
+            self.page.goto(f"https://www.instagram.com/{target}/", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(3)
+            
+            # Followers tugmasini bosish
+            followers_btn = self.page.locator('a[href$="/followers/"]').first
+            followers_btn.click()
+            time.sleep(3)
+            
+            # Dialog ochilganini kutish
+            dialog = self.page.locator('div[role="dialog"]').first
+            dialog.wait_for(timeout=10000)
+            time.sleep(2)
+            
+            collected = set()
+            scroll_count = 0
+            MAX_SCROLLS = 500  # Ko'p scroll (10k uchun)
+            no_new_count = 0  # Yangi user topilmasa sanash
+            
+            while len(collected) < max_count and scroll_count < MAX_SCROLLS:
+                # Linklar olish
+                follower_links = dialog.locator('a')
+                link_count = follower_links.count()
+                
+                new_in_scroll = 0
+                
+                for i in range(link_count):
+                    if len(collected) >= max_count:
+                        break
+                    try:
+                        href = follower_links.nth(i).get_attribute("href")
+                        if not href or not href.startswith("/"):
+                            continue
+                        
+                        username = href.strip("/").split("/")[0]
+                        
+                        # Validatsiya
+                        if not username or len(username) < 2:
+                            continue
+                        if username in [target, 'explore', 'reels', 'stories', 'direct', 'accounts', config.INSTAGRAM_USERNAME]:
+                            continue
+                        
+                        if username not in collected:
+                            collected.add(username)
+                            result["total_found"] += 1
+                            
+                            # Bazaga saqlash
+                            if database.add_pending_user(username):
+                                result["new_added"] += 1
+                                new_in_scroll += 1
+                            else:
+                                result["already_in_db"] += 1
+                    except:
+                        continue
+                
+                # Progress log
+                if scroll_count % 10 == 0:
+                    logger.info(f"📊 Progress: {len(collected)}/{max_count} topildi, {result['new_added']} yangi qo'shildi")
+                
+                # Yangi user topilmadimi?
+                if new_in_scroll == 0:
+                    no_new_count += 1
+                    if no_new_count >= 10:  # 10 scroll yangi user bo'lmasa to'xtash
+                        logger.info("⚠️ 10 scrollda yangi user topilmadi, to'xtatilmoqda...")
+                        break
+                else:
+                    no_new_count = 0
+                
+                # Scroll
+                try:
+                    self.page.evaluate("""() => {
+                        const dialog = document.querySelector('div[role="dialog"]');
+                        if (dialog) {
+                            const divs = dialog.querySelectorAll('div');
+                            for (const div of divs) {
+                                if (div.scrollHeight > div.clientHeight) {
+                                    div.scrollTop += 800;
+                                    break;
+                                }
+                            }
+                        }
+                    }""")
+                    time.sleep(1)
+                except:
+                    pass
+                
+                scroll_count += 1
+            
+            # Dialogni yopish
+            self.page.keyboard.press("Escape")
+            time.sleep(1)
+            
+            logger.info(f"\n{'='*50}")
+            logger.info(f"✅ TO'PLASH TUGADI!")
+            logger.info(f"📊 Jami topildi: {result['total_found']}")
+            logger.info(f"✅ Yangi qo'shildi: {result['new_added']}")
+            logger.info(f"♻️ Bazada bor edi: {result['already_in_db']}")
+            logger.info(f"{'='*50}\n")
+            
+            # Backup
+            try:
+                import backup
+                backup.backup_to_gist()
+                logger.info("💾 Backup saqlandi")
+            except:
+                pass
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Collect xatosi: {e}")
+            result["errors"] += 1
+            return result
+    
     def _is_logged_in(self) -> bool:
         """Login holatini tekshirish"""
         try:
