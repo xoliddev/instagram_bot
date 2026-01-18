@@ -231,42 +231,59 @@ class InstagramBrowserBot:
                     logger.info(f"✅ Yetarlicha yangi user topildi: {len(users)} ta")
                     break
                 
-                # Scroll - JavaScript usuli (ishonchliroq)
+                # Scroll - Multiple methods
                 try:
-                    # Dialog ichidagi scrollable container ni topish
-                    scroll_success = dialog.evaluate("""(el) => {
-                        // Instagram dialog scrollable containerlarini topish
-                        const scrollables = el.querySelectorAll('[style*="overflow"]');
+                    # Method 1: Dialog ichidagi barcha divlarni scroll qilish
+                    scroll_success = self.page.evaluate("""() => {
+                        const dialog = document.querySelector('div[role="dialog"]');
+                        if (!dialog) return false;
+                        
+                        // Instagram'ning scrollable containerini topish
+                        const containers = dialog.querySelectorAll('div');
                         let scrolled = false;
-                        for (const s of scrollables) {
-                            const before = s.scrollTop;
-                            s.scrollTop += 800;
-                            if (s.scrollTop > before) {
-                                scrolled = true;
-                                break;
+                        
+                        for (const div of containers) {
+                            // Scrollable bo'lsa
+                            if (div.scrollHeight > div.clientHeight) {
+                                const before = div.scrollTop;
+                                div.scrollTop += 500;
+                                if (div.scrollTop > before) {
+                                    scrolled = true;
+                                    break;
+                                }
                             }
-                        }
-                        // Agar container topilmasa, dialog o'zini scroll qilish
-                        if (!scrolled) {
-                            const before = el.scrollTop;
-                            el.scrollTop += 800;
-                            scrolled = el.scrollTop > before;
                         }
                         return scrolled;
                     }""")
                     
                     if not scroll_success:
-                        # Fallback: Mouse wheel
-                        box = dialog.bounding_box()
-                        if box:
-                            self.page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-                            self.page.mouse.wheel(0, 5000)
+                        # Method 2: Keyboard scroll (PageDown)
+                        try:
+                            dialog.click()
+                            time.sleep(0.3)
+                            for _ in range(3):
+                                self.page.keyboard.press("PageDown")
+                                time.sleep(0.2)
+                        except:
+                            pass
                     
-                    logger.info(f"🖱️ Scroll #{scroll_count}: {len(users)}/{count} topildi")
-                    time.sleep(2)  # Loading kutish
+                    if not scroll_success:
+                        # Method 3: Mouse wheel directly on dialog
+                        try:
+                            box = dialog.bounding_box()
+                            if box:
+                                self.page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+                                self.page.mouse.wheel(0, 1000)
+                        except:
+                            pass
+                    
+                    logger.info(f"🖱️ Scroll #{scroll_count}: {len(users)}/{count} yangi user topildi")
+                    time.sleep(1.5)  # Yangi content yuklanishi uchun
                     
                 except Exception as e:
                     logger.warning(f"⚠️ Scroll xatosi: {e}")
+                    # Xato bo'lsa ham davom etamiz
+                    time.sleep(1)
                 
                 scroll_count += 1
             
