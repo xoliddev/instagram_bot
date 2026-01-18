@@ -96,7 +96,7 @@ def add_pending_user(username, source_target=None):
 def get_pending_users(count=20):
     """Pending statusdagi userlarni olish (follow qilish uchun)"""
     try:
-        with get_connection() as conn:
+        with closing(get_connection()) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT username FROM users 
@@ -112,7 +112,7 @@ def get_pending_users(count=20):
 def get_pending_count():
     """Pending statusdagi userlar soni"""
     try:
-        with get_connection() as conn:
+        with closing(get_connection()) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE status = 'pending'")
             return cursor.fetchone()['cnt']
@@ -222,7 +222,7 @@ def get_all_users_by_status(status: str = None):
 def get_non_followers():
     """Follow qilmagan userlar (waiting status, 24 soat o'tgan)"""
     try:
-        with get_connection() as conn:
+        with closing(get_connection()) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT username, followed_at 
@@ -235,19 +235,23 @@ def get_non_followers():
         logger.error(f"❌ DB Get non-followers error: {e}")
         return []
 
+from contextlib import closing
+
+# ... (imports)
+
 def set_config(key: str, value: str):
     """Config qiymatini saqlash"""
     try:
-        with get_connection() as conn:
-            conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, str(value)))
-            conn.commit()
+        with closing(get_connection()) as conn:
+            with conn: # Transaction
+                conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, str(value)))
     except Exception as e:
         logger.error(f"❌ DB Set config error: {e}")
 
 def get_config(key: str, default=None):
     """Config qiymatini olish"""
     try:
-        with get_connection() as conn:
+        with closing(get_connection()) as conn:
             cursor = conn.execute("SELECT value FROM config WHERE key = ?", (key,))
             result = cursor.fetchone()
             return result['value'] if result else default
