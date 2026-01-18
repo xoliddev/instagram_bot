@@ -199,13 +199,23 @@ class InstagramBrowserBot:
             while len(users) < count and scroll_count < MAX_SCROLLS:
                 dialog = self.page.locator('div[role="dialog"]').first
                 
-                # Instagram follower linklar - aniqroq selektor
-                follower_links = dialog.locator('a[href^="/"]')
+                # Dialog content yuklanishini kutish
+                if scroll_count == 0:
+                    time.sleep(2)  # Dastlabki yuklanish uchun
+                
+                # Barcha linklar (avvalgi ishlaydigan usul)
+                follower_links = dialog.locator('a')
                 current_batch_count = follower_links.count()
                 
                 # Debug: nechta link topildi
                 if scroll_count == 0:
                     logger.info(f"📊 Dialog da {current_batch_count} ta link topildi")
+                    if current_batch_count == 0:
+                        # Yana bir oz kutib ko'ramiz
+                        time.sleep(3)
+                        follower_links = dialog.locator('a')
+                        current_batch_count = follower_links.count()
+                        logger.info(f"📊 Qayta urinish: {current_batch_count} ta link")
                 
                 new_in_this_scroll = 0
                 skipped_in_db = 0
