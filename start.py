@@ -64,9 +64,25 @@ def main():
     backup_thread.start()
     logger.info("💾 Avtomatik backup har 1 soatda ishlaydi")
     
-    # 3. Instagram bot - alohida thread
-    instagram_thread = threading.Thread(target=run_instagram_bot, daemon=True)
-    instagram_thread.start()
+    # 3. Instagram bot - alohida thread (Auto-Restart bilan)
+    def start_insta_thread():
+        thread = threading.Thread(target=run_instagram_bot, daemon=True)
+        thread.start()
+        return thread
+
+    insta_thread = start_insta_thread()
+    
+    # Monitor thread
+    def monitor_threads():
+        nonlocal insta_thread
+        while True:
+            time.sleep(10)
+            if not insta_thread.is_alive():
+                logger.warning("⚠️ Instagram Bot Thread to'xtab qoldi! Qayta ishga tushirilmoqda...")
+                insta_thread = start_insta_thread()
+    
+    monitor = threading.Thread(target=monitor_threads, daemon=True)
+    monitor.start()
     
     # 4. Telegram bot - main thread
     time.sleep(3)

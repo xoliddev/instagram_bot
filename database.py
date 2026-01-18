@@ -11,6 +11,8 @@ def get_connection():
     """Baza bilan ulanish"""
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
+    # WAL rejimini yoqish (Concurrency uchun muhim)
+    conn.execute("PRAGMA journal_mode=WAL;")
     return conn
 
 def init_db():
