@@ -28,6 +28,7 @@ INITIAL_ADMIN_IDS = [int(x.strip()) for x in ADMIN_IDS_STR.split(",") if x.strip
 ADMINS_FILE = Path("admins.json")
 TARGETS_FILE = Path("targets.json")
 LOG_FILE = Path("bot.log")
+DB_FILE = Path("bot.db")
 
 # ============ DATA MANAGEMENT ============
 def load_admins() -> list:
@@ -113,6 +114,8 @@ async def cmd_start(message: Message):
 ▶️ /follow [son] - Follow sikli
 ⏹️ /unfollow - Unfollow sikli
 🧹 /cleanup - Following tozalash
+👎 /non_followers - Follow qaytarmaganlar
+✅ /followed_back - Follow qaytarganlar
 📜 /logs - Oxirgi loglar
 🎯 /targets - Targetlar ro'yxati
 
@@ -331,6 +334,59 @@ async def cmd_cleanup(message: Message):
     
     await message.answer("🧹 Following tozalash sikli boshlanmoqda...\n\n<i>Sizga follow qilmaganlar unfollow qilinadi.</i>")
     state.current_cycle = "cleanup"
+
+@router.message(Command("non_followers"))
+async def cmd_non_followers(message: Message):
+    """Sizga follow qilmaganlar ro'yxati"""
+    if not is_admin(message.from_user.id):
+        return
+    
+    await message.answer("🔍 Bazadan ma'lumotlar olinmoqda...")
+    
+    # Waiting statusdagi userlar (follow qaytarmagan)
+    waiting_users = database.get_non_followers()
+    
+    if not waiting_users:
+        await message.answer("✅ Hozircha follow qaytarmagan foydalanuvchi yo'q yoki baza bo'sh.")
+        return
+    
+    # Ro'yxat tuzish
+    text = f"👎 <b>Follow qaytarmaganlar:</b> {len(waiting_users)} ta\n\n"
+    
+    for i, user in enumerate(waiting_users[:30], 1):  # Max 30 ta ko'rsatish
+        username = user['username']
+        followed_at = user['followed_at']
+        text += f"{i}. @{username}\n"
+    
+    if len(waiting_users) > 30:
+        text += f"\n<i>... va yana {len(waiting_users) - 30} ta</i>"
+    
+    text += "\n\n💡 <i>Ularni unfollow qilish uchun: /cleanup</i>"
+    
+    await message.answer(text)
+
+@router.message(Command("followed_back"))
+async def cmd_followed_back(message: Message):
+    """Follow qaytarganlar ro'yxati"""
+    if not is_admin(message.from_user.id):
+        return
+    
+    users = database.get_all_users_by_status('followed_back')
+    
+    if not users:
+        await message.answer("📭 Hozircha follow qaytargan foydalanuvchi yo'q.")
+        return
+    
+    text = f"✅ <b>Follow qaytarganlar:</b> {len(users)} ta\n\n"
+    
+    for i, user in enumerate(users[:30], 1):
+        username = user['username']
+        text += f"{i}. @{username}\n"
+    
+    if len(users) > 30:
+        text += f"\n<i>... va yana {len(users) - 30} ta</i>"
+    
+    await message.answer(text)
 
 # ============ NOTIFICATION HELPER ============
 async def notify_admins(text: str):

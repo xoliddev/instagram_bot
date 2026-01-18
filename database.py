@@ -153,3 +153,34 @@ def get_total_stats():
     except Exception as e:
         logger.error(f"❌ DB Get total stats error: {e}")
         return 0, 0, 0
+
+def get_all_users_by_status(status: str = None):
+    """Statusga ko'ra userlarni olish"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            if status:
+                cursor.execute("SELECT username, status, followed_at FROM users WHERE status = ? ORDER BY followed_at DESC", (status,))
+            else:
+                cursor.execute("SELECT username, status, followed_at FROM users ORDER BY followed_at DESC")
+            return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"❌ DB Get all users error: {e}")
+        return []
+
+def get_non_followers():
+    """Follow qilmagan userlar (waiting status, 24 soat o'tgan)"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT username, followed_at 
+                FROM users 
+                WHERE status = 'waiting' 
+                ORDER BY followed_at ASC
+            """)
+            return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"❌ DB Get non-followers error: {e}")
+        return []
+
