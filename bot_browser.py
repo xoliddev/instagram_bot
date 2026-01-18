@@ -169,13 +169,16 @@ class InstagramBrowserBot:
         except:
             return False
     
-    def get_followers_of_target(self, count: int = 30) -> list:
+    def get_followers_of_target(self, count: int = 30, target: str = None) -> list:
         """Target akkauntning followerlarini olish"""
-        logger.info(f"🎯 @{config.TARGET_ACCOUNT} followerlarini olmoqda...")
+        if target is None:
+            target = config.TARGET_ACCOUNT
+        
+        logger.info(f"🎯 @{target} followerlarini olmoqda...")
         
         try:
             # Target profilga o'tish
-            self.page.goto(f"https://www.instagram.com/{config.TARGET_ACCOUNT}/", wait_until="domcontentloaded", timeout=60000)
+            self.page.goto(f"https://www.instagram.com/{target}/", wait_until="domcontentloaded", timeout=60000)
             time.sleep(3)
             
             # Followers tugmasini bosish
@@ -207,7 +210,7 @@ class InstagramBrowserBot:
                             username = href.strip("/").split("/")[0]
                             
                             # Validatsiya
-                            if not username or username == config.TARGET_ACCOUNT:
+                            if not username or username == target:
                                 continue
                             
                             # 1. Avval topilganmi?
@@ -439,13 +442,30 @@ class InstagramBrowserBot:
             logger.error(f"❌ Unfollow xatosi @{username}: {e}")
             return False
     
-    def run_follow_cycle(self, count: int = 20):
+    def run_follow_cycle(self, count: int = 20, target: str = None):
         """Follow sikli"""
+        # Multi-target: random target tanlash
+        if target is None:
+            from pathlib import Path
+            targets_file = Path("targets.json")
+            if targets_file.exists():
+                try:
+                    import json
+                    with open(targets_file, 'r') as f:
+                        targets = json.load(f)
+                    if targets:
+                        target = random.choice(targets)
+                        logger.info(f"🎲 Tasodifiy target tanlandi: @{target}")
+                except:
+                    pass
+            if target is None:
+                target = config.TARGET_ACCOUNT
+        
         logger.info(f"\n{'='*50}")
-        logger.info("🚀 FOLLOW SIKLI BOSHLANDI")
+        logger.info(f"🚀 FOLLOW SIKLI BOSHLANDI - Target: @{target}")
         logger.info(f"{'='*50}\n")
         
-        users = self.get_followers_of_target(count)
+        users = self.get_followers_of_target(count, target)
         
         if not users:
             logger.warning("⚠️ Foydalanuvchi topilmadi")
