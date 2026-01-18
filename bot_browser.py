@@ -194,38 +194,62 @@ class InstagramBrowserBot:
             
             logger.info("🔍 Deep Scroll boshlandi: Faqat yangi (bazada yo'q) userlar qidirilmoqda...")
             
+            seen_usernames = set()  # Takroriy tekshiruvni tezlashtirish
+            
             while len(users) < count and scroll_count < MAX_SCROLLS:
                 dialog = self.page.locator('div[role="dialog"]').first
-                follower_links = dialog.locator('a')
+                
+                # Instagram follower linklar - aniqroq selektor
+                follower_links = dialog.locator('a[href^="/"]')
                 current_batch_count = follower_links.count()
                 
-                logger.debug(f"📜 Scroll #{scroll_count}: {current_batch_count} ta link ko'rildi")
+                # Debug: nechta link topildi
+                if scroll_count == 0:
+                    logger.info(f"📊 Dialog da {current_batch_count} ta link topildi")
+                
+                new_in_this_scroll = 0
+                skipped_in_db = 0
+                skipped_invalid = 0
 
                 for i in range(current_batch_count):
                     if len(users) >= count:
                         break
                     try:
                         href = follower_links.nth(i).get_attribute("href")
-                        if href and href.startswith("/") and len(href) > 2:
-                            username = href.strip("/").split("/")[0]
+                        if not href or not href.startswith("/"):
+                            continue
                             
-                            # Validatsiya
-                            if not username or username == target:
-                                continue
+                        # Username ajratish
+                        username = href.strip("/").split("/")[0]
+                        
+                        # Validatsiya
+                        if not username or len(username) < 2:
+                            skipped_invalid += 1
+                            continue
+                        if username == target or username in ['explore', 'reels', 'stories', 'direct', 'accounts']:
+                            skipped_invalid += 1
+                            continue
+                        
+                        # 1. Shu scrollda ko'rilganmi?
+                        if username in seen_usernames:
+                            continue
+                        seen_usernames.add(username)
+                        
+                        # 2. Bazada bormi?
+                        if database.get_user(username):
+                            skipped_in_db += 1
+                            continue
                             
-                            # 1. Avval topilganmi?
-                            if username in users:
-                                continue
-                                
-                            # 2. Bazada bormi?
-                            if database.get_user(username):
-                                # logger.debug(f"♻️ Eski user (Bazada bor): {username}")
-                                continue
-                                
-                            # Yangi topildi!
-                            users.append(username)
-                    except:
+                        # Yangi topildi!
+                        users.append(username)
+                        new_in_this_scroll += 1
+                        
+                    except Exception as e:
                         continue
+                
+                # Debug logging
+                if skipped_in_db > 0 or skipped_invalid > 0:
+                    logger.info(f"📊 Scroll #{scroll_count}: +{new_in_this_scroll} yangi, {skipped_in_db} bazada bor, {skipped_invalid} noto'g'ri")
                 
                 if len(users) >= count:
                     logger.info(f"✅ Yetarlicha yangi user topildi: {len(users)} ta")
