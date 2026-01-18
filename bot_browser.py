@@ -25,6 +25,7 @@ except ImportError:
 import config
 import keep_alive
 import database
+import migrate_json_to_sqlite
 
 # Colorama init
 init(autoreset=True)
@@ -49,6 +50,58 @@ class InstagramBrowserBot:
         database.init_db()
         self.playwright = None
         self.browser = None
+        self.context = None
+        self.page = None
+
+    def get_human_delay(self, min_sec: int, max_sec: int) -> int:
+        """Insoniy vaqt oralig'i"""
+        mean = (min_sec + max_sec) / 2
+        std = (max_sec - min_sec) / 4
+        delay = int(random.gauss(mean, std))
+        return max(min_sec, min(max_sec, delay))
+
+    def start_browser(self) -> bool:
+        """Brauzerni ishga tushirish"""
+        logger.info("🌐 Brauzer ishga tushirilmoqda...")
+        
+        try:
+            self.playwright = sync_playwright().start()
+            
+            # Persistent context (cookie'lar saqlanadi)
+            user_data_dir = Path("browser_data")
+            user_data_dir.mkdir(exist_ok=True)
+            
+            self.context = self.playwright.chromium.launch_persistent_context(
+                user_data_dir=str(user_data_dir),
+                headless=config.HEADLESS,  # Configdan o'qish
+                args=["--no-sandbox", "--disable-setuid-sandbox"] if config.HEADLESS else [],
+                viewport={"width": 1280, "height": 800},
+                locale="en-US"
+            )
+            
+            # 🍪 Cookie'larni yuklash (Koyeb uchun)
+            cookie_file = Path("playwright_cookies.json")
+            if cookie_file.exists():
+                try:
+                    with open(cookie_file, 'r', encoding='utf-8') as f:
+                        cookies = json.load(f)
+                        self.context.add_cookies(cookies)
+                        logger.info(f"🍪 {len(cookies)} ta cookie yuklandi")
+                except Exception as e:
+                    logger.error(f"❌ Cookie yuklash xatosi: {e}")
+            
+            self.page = self.context.new_page()
+            logger.info("✅ Brauzer tayyor")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Brauzer xatosi: {e}")
+            return False
+
+    def login(self) -> bool:
+        """Instagram'ga kirish"""
+        logger.info("🔐 Instagram tekshirilmoqda...")
+        
         # Instagram'ga o'tish
         try:
             self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
@@ -429,6 +482,12 @@ def main():
         keep_alive.keep_alive()
     except Exception as e:
         logger.error(f"Keep-alive start error: {e}")
+
+    # Migratsiya
+    try:
+        migrate_json_to_sqlite.migrate()
+    except Exception as e:
+        logger.error(f"Migration error: {e}")
 
     print(f"""
 {Fore.CYAN}╔══════════════════════════════════════════════════════════════╗
