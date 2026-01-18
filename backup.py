@@ -197,8 +197,13 @@ def auto_restore_if_empty():
             logger.info("📥 Lokal baza bo'sh, Gist dan yuklanmoqda...")
             return restore_from_gist()
         
-        logger.info(f"✅ Lokal bazada {count} ta user mavjud")
-        return True
+        # Agar baza bo'sh bo'lmasa ham, Gist dagi ma'lumotlarni merge qilishimiz kerak
+        logger.info(f"✅ Lokal bazada {count} ta user mavjud. Gist bilan senxronizatsiya qilinmoqda...")
+        return restore_from_gist()
+        
+    except Exception as e:
+        logger.error(f"❌ Auto-restore xatosi: {e}")
+        return restore_from_gist()
         
     except Exception as e:
         logger.error(f"❌ Auto-restore xatosi: {e}")
