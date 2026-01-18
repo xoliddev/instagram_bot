@@ -917,10 +917,14 @@ def main():
         
         try:
                 try:
-                    # 1. State tekshirish
-                    logger.info(f"🔄 CYCLE CHECK: {telegram_bot.state.current_cycle} (Target: {telegram_bot.state.collect_target})")
+                    # 1. State tekshirish (Bazadan)
+                    current_cycle = database.get_config("current_cycle", "auto")
+                    collect_target = database.get_config("collect_target")
+                    collect_count_str = database.get_config("collect_count", "1000")
+                    collect_count = int(collect_count_str) if collect_count_str.isdigit() else 1000
+                    
+                    logger.info(f"🔄 CYCLE CHECK: {current_cycle} (Target: {collect_target})")
 
-                        
                     # ==========================================
                     # ♻️ SIKL TURLARI BO'YICHA ISHLASH
                     # ==========================================
@@ -928,28 +932,25 @@ def main():
                     # ------------------------------------------
                     # MODE 1: COLLECT (Yig'ish)
                     # ------------------------------------------
-                    if telegram_bot.state.current_cycle == 'collect':
-                        target = telegram_bot.state.collect_target
-                        count = telegram_bot.state.collect_count
-                        
-                        if target:
+                    if current_cycle == 'collect':
+                        if collect_target:
                             logger.info(f"\n{'='*40}")
-                            logger.info(f"📥 COLLECT BOSHLANDI: @{target} ({count} ta)")
+                            logger.info(f"📥 COLLECT BOSHLANDI: @{collect_target} ({collect_count} ta)")
                             logger.info(f"{'='*40}")
                             
-                            bot.collect_followers(target, count)
+                            bot.collect_followers(collect_target, collect_count)
                             
                             logger.info("✅ Collect tugadi. Auto rejimga qaytilmoqda.")
-                            telegram_bot.state.current_cycle = "auto"
-                            telegram_bot.state.collect_target = None
+                            database.set_config("current_cycle", "auto")
+                            database.set_config("collect_target", "")
                         else:
                             logger.warning("⚠️ Collect target topilmadi")
-                            telegram_bot.state.current_cycle = "auto"
+                            database.set_config("current_cycle", "auto")
 
                     # ------------------------------------------
                     # MODE 2: CLEANUP (Tozalash)
                     # ------------------------------------------
-                    elif telegram_bot.state.current_cycle == 'cleanup':
+                    elif current_cycle == 'cleanup':
                         logger.info(f"\n{'='*40}")
                         logger.info("🧹 CLEANUP BOSHLANDI (Unfollow non-followers)")
                         logger.info(f"{'='*40}")
@@ -957,7 +958,7 @@ def main():
                         bot.cleanup_following()
                         
                         logger.info("✅ Cleanup tugadi. Auto rejimga qaytilmoqda.")
-                        telegram_bot.state.current_cycle = "auto"
+                        database.set_config("current_cycle", "auto")
 
                     # ------------------------------------------
                     # MODE 3: AUTO (Faqat Baza bilan ishlash)
@@ -1008,8 +1009,9 @@ def main():
                         slept += 5
                         
                         # Agar buyruq kelsa - kutishni buzamiz
-                        if telegram_bot.state.current_cycle in ['collect', 'cleanup']:
-                            logger.info(f"⚡ Yangi buyruq ({telegram_bot.state.current_cycle})! Kutish to'xtatildi.")
+                        new_cycle = database.get_config("current_cycle", "auto")
+                        if new_cycle in ['collect', 'cleanup']:
+                            logger.info(f"⚡ Yangi buyruq ({new_cycle})! Kutish to'xtatildi.")
                             break
                             
                 except Exception as e:

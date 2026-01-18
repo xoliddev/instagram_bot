@@ -349,7 +349,7 @@ async def cmd_cleanup(message: Message):
         return
     
     await message.answer("🧹 Following tozalash sikli boshlanmoqda...\n\n<i>Sizga follow qilmaganlar unfollow qilinadi.</i>")
-    state.current_cycle = "cleanup"
+    database.set_config("current_cycle", "cleanup")
 
 @router.message(Command("collect"))
 async def cmd_collect(message: Message):
@@ -378,9 +378,9 @@ async def cmd_collect(message: Message):
 <i>Bu jarayon bir necha daqiqa olishi mumkin...</i>
 <i>Progress Koyeb loglarida ko'rinadi.</i>""")
     
-    state.current_cycle = "collect"
-    state.collect_target = target
-    state.collect_count = count
+    database.set_config("current_cycle", "collect")
+    database.set_config("collect_target", target)
+    database.set_config("collect_count", count)
 
 @router.message(Command("pending"))
 async def cmd_pending(message: Message):

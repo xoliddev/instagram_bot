@@ -39,8 +39,16 @@ def init_db():
                 )
             """)
             
+            # Config jadvali (State management uchun)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
+            
             conn.commit()
-            logger.info("✅ Baza ishga tushdi (users, daily_stats)")
+            logger.info("✅ Baza ishga tushdi (users, daily_stats, config)")
     except Exception as e:
         logger.error(f"❌ Baza yaratish xatosi: {e}")
 
@@ -226,4 +234,24 @@ def get_non_followers():
     except Exception as e:
         logger.error(f"❌ DB Get non-followers error: {e}")
         return []
+
+def set_config(key: str, value: str):
+    """Config qiymatini saqlash"""
+    try:
+        with get_connection() as conn:
+            conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, str(value)))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"❌ DB Set config error: {e}")
+
+def get_config(key: str, default=None):
+    """Config qiymatini olish"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute("SELECT value FROM config WHERE key = ?", (key,))
+            result = cursor.fetchone()
+            return result['value'] if result else default
+    except Exception as e:
+        logger.error(f"❌ DB Get config error: {e}")
+        return default
 
