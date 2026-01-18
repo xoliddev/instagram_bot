@@ -184,51 +184,61 @@ class InstagramBrowserBot:
             time.sleep(5)
             self.page.screenshot(path="debug_followers_dialog.png")
             
+            # Deep Scroll Logic
             users = []
             scroll_count = 0
-            max_scrolls = count // 10 + 2
+            MAX_SCROLLS = 100 # Chuqur qidirish
             
-            while len(users) < count and scroll_count < max_scrolls:
-                # Follower linkalarini olish
+            logger.info("🔍 Deep Scroll boshlandi: Faqat yangi (bazada yo'q) userlar qidirilmoqda...")
+            
+            while len(users) < count and scroll_count < MAX_SCROLLS:
                 dialog = self.page.locator('div[role="dialog"]').first
                 follower_links = dialog.locator('a')
-                logger.info(f"DEBUG: Linklar soni: {follower_links.count()}")
+                current_batch_count = follower_links.count()
                 
-                for i in range(follower_links.count()):
+                logger.debug(f"📜 Scroll #{scroll_count}: {current_batch_count} ta link ko'rildi")
+
+                for i in range(current_batch_count):
+                    if len(users) >= count:
+                        break
                     try:
                         href = follower_links.nth(i).get_attribute("href")
-                        if href and href.startswith("/") and "/" in href[1:]:
+                        if href and href.startswith("/") and len(href) > 2:
                             username = href.strip("/").split("/")[0]
-                            if username and username not in users and username != config.TARGET_ACCOUNT:
-                                users.append(username)
+                            
+                            # Validatsiya
+                            if not username or username == config.TARGET_ACCOUNT:
+                                continue
+                            
+                            # 1. Avval topilganmi?
+                            if username in users:
+                                continue
+                                
+                            # 2. Bazada bormi?
+                            if database.get_user(username):
+                                # logger.debug(f"♻️ Eski user (Bazada bor): {username}")
+                                continue
+                                
+                            # Yangi topildi!
+                            users.append(username)
                     except:
                         continue
                 
-                # Scroll - Mouse Wheel usuli (Eng ishonchli)
+                if len(users) >= count:
+                    logger.info(f"✅ Yetarlicha yangi user topildi: {len(users)} ta")
+                    break
+                
+                # Scroll - Mouse Wheel usuli
                 try:
-                    # 1. Dialog markazini topish
                     box = dialog.bounding_box()
                     if box:
-                        # Sichqonchani o'rtaga olib borish
                         self.page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-                        
-                        # G'ildirakni aylantirish
                         self.page.mouse.wheel(0, 5000)
-                        logger.info("🖱️ Mouse wheel ishlatildi...")
+                        logger.info(f"🖱️ Scroll qilinmoqda... ({len(users)}/{count} topildi)")
                     else:
-                        # Fallback: JS orqali barcha divlarni scroll qilish
-                        dialog.evaluate("""element => {
-                            const divs = element.querySelectorAll('div');
-                            divs.forEach(div => {
-                                if (div.scrollHeight > div.clientHeight) {
-                                    div.scrollTop += 1000;
-                                }
-                            });
-                        }""")
-                        logger.info("📜 JS Universal Scroll ishlatildi...")
+                        dialog.evaluate("el => el.scrollTop += 1500")
                         
                     time.sleep(3) # Loading...
-                    
                 except Exception as e:
                     logger.warning(f"⚠️ Scroll xatosi: {e}")
                 
