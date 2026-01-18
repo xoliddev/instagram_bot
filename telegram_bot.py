@@ -388,6 +388,42 @@ async def cmd_followed_back(message: Message):
     
     await message.answer(text)
 
+@router.message(Command("backup"))
+async def cmd_backup(message: Message):
+    """Bazani GitHub Gist ga saqlash"""
+    if not is_admin(message.from_user.id):
+        return
+    
+    await message.answer("💾 Backup boshlanmoqda...")
+    
+    try:
+        import backup
+        if backup.backup_to_gist():
+            data = backup.export_db_to_json()
+            user_count = len(data.get("users", []))
+            await message.answer(f"✅ Backup muvaffaqiyatli!\n\n👥 {user_count} ta user saqlandi\n\n<i>Gist da saqlandi</i>")
+        else:
+            await message.answer("❌ Backup xatosi!\n\n<i>GITHUB_TOKEN yoki GIST_ID ni tekshiring</i>")
+    except Exception as e:
+        await message.answer(f"❌ Xato: {e}")
+
+@router.message(Command("restore"))
+async def cmd_restore(message: Message):
+    """Bazani GitHub Gist dan qayta yuklash"""
+    if not is_admin(message.from_user.id):
+        return
+    
+    await message.answer("📥 Restore boshlanmoqda...")
+    
+    try:
+        import backup
+        if backup.restore_from_gist():
+            await message.answer("✅ Restore muvaffaqiyatli!\n\n<i>Baza yangilandi</i>")
+        else:
+            await message.answer("❌ Restore xatosi!\n\n<i>GITHUB_TOKEN yoki GIST_ID ni tekshiring</i>")
+    except Exception as e:
+        await message.answer(f"❌ Xato: {e}")
+
 # ============ NOTIFICATION HELPER ============
 async def notify_admins(text: str):
     """Barcha adminlarga xabar yuborish"""

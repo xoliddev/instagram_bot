@@ -104,7 +104,8 @@ Juda ko'p so'rov yuborilgan. Bot avtomatik 10 daqiqa kutadi.
 SMS yoki Authenticator kodini kiriting.
 
 ## 📞 Aloqa
-
+rustamxujayevabdulboriy@gmail.com
+instagram:@ab.dveloper
 Savollar bo'lsa, murojaat qiling!
 
 ---

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Startup script - Both bots run together
-Instagram Bot + Telegram Bot
+Instagram Bot + Telegram Bot + Auto Backup
 """
 import threading
 import time
@@ -13,6 +13,25 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+def auto_restore_database():
+    """Startup da bazani Gist dan qayta yuklash"""
+    try:
+        import backup
+        backup.auto_restore_if_empty()
+    except Exception as e:
+        logger.error(f"❌ Auto-restore xatosi: {e}")
+
+def periodic_backup():
+    """Har soatda avtomatik backup"""
+    while True:
+        time.sleep(3600)  # 1 soat kutish
+        try:
+            import backup
+            backup.backup_to_gist()
+            logger.info("💾 Avtomatik backup muvaffaqiyatli")
+        except Exception as e:
+            logger.error(f"❌ Periodic backup xatosi: {e}")
 
 def run_instagram_bot():
     """Instagram botni ishga tushirish"""
@@ -36,16 +55,23 @@ def main():
     """Ikkala botni parallel ishga tushirish"""
     logger.info("🚀 Barcha botlar ishga tushmoqda...")
     
-    # Instagram bot - alohida thread
+    # 1. Bazani restore qilish (agar kerak bo'lsa)
+    logger.info("📥 Baza tekshirilmoqda...")
+    auto_restore_database()
+    
+    # 2. Periodic backup thread
+    backup_thread = threading.Thread(target=periodic_backup, daemon=True)
+    backup_thread.start()
+    logger.info("💾 Avtomatik backup har 1 soatda ishlaydi")
+    
+    # 3. Instagram bot - alohida thread
     instagram_thread = threading.Thread(target=run_instagram_bot, daemon=True)
     instagram_thread.start()
     
-    # Telegram bot - main thread (async loop needs main)
-    # Bir oz kutamiz Instagram bot boshlangunga qadar
+    # 4. Telegram bot - main thread
     time.sleep(3)
-    
-    # Telegram bot
     run_telegram_bot()
 
 if __name__ == "__main__":
     main()
+
