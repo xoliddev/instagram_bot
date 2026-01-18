@@ -329,6 +329,16 @@ class InstagramBrowserBot:
             if database.add_user(username):
                 daily_follow, _ = database.get_today_stats()
                 logger.info(f"{Fore.GREEN}✅ Follow: @{username} [{daily_follow}/{config.DAILY_FOLLOW_LIMIT}]")
+                
+                # Har 5 ta followdan keyin backup (tez-tez saqlash, lekin API limitga yetmaslik)
+                if daily_follow % 5 == 0:
+                    try:
+                        import backup
+                        backup.backup_to_gist()
+                        logger.info("💾 Avtomatik backup (har 5 ta follow)")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Backup xatosi: {e}")
+                
                 return True
             else:
                 return False
