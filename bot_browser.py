@@ -914,23 +914,91 @@ def main():
         print(f"\n{Fore.YELLOW}🤖 AVTOMATIK REJIM (24/7) - Server")
         
         try:
+            # Asosiy Loop
             while True:
-                # Tungi rejim OLIB TASHLANDI
-                # Bot endi 24/7 ishlaydi, faqat oraliq vaqtlar (delay) bilan.
-                
-                # 1. Follow sikli
-                bot.run_follow_cycle(20)
-                bot.show_stats()
-                
-                # 2. Unfollow sikli
-                bot.check_and_unfollow()
-                bot.show_stats()
-                
-                # 3. Kutish (Random 1-2 soat)
-                # Odamga o'xshash uchun qat'iy 1 soat emas, random qilamiz
-                wait_time = random.randint(3600, 7200) 
-                logger.info(f"⏳ Sikl tugadi. {wait_time/60:.1f} daqiqa kutilmoqda dam olish uchun...")
-                time.sleep(wait_time)
+                try:
+                    # 1. Telegram buyruqlarini tekshirish
+                    try:
+                        import telegram_bot
+                        if telegram_bot.state.current_cycle == "collect":
+                            # Target aniqlash (loglardan yoki default)
+                            # Hozircha hardcode yoki oxirgi buyruqdan olish kerak
+                            # Lekin soddalashtirish uchun: agar collect bo'lsa, lekin argument yo'q bo'lsa, logga yozamiz
+                            pass
+                    except:
+                        pass
+                        
+                    # Sikl turi bo'yicha ishlash
+                    if telegram_bot.state.current_cycle == 'collect':
+                        target = telegram_bot.state.collect_target
+                        count = telegram_bot.state.collect_count
+                        
+                        if target:
+                            logger.info(f"📥 Collect buyrug'i bajarilmoqda: {target} ({count})")
+                            bot.collect_followers(target, count)
+                            
+                            # Collect tugagach statusni auto ga qaytaramiz
+                            telegram_bot.state.current_cycle = "auto"
+                            telegram_bot.state.collect_target = None
+                        else:
+                            logger.warning("⚠️ Collect target topilmadi")
+                            telegram_bot.state.current_cycle = "auto"
+                        
+                    # Oddiy avtomatik rejim
+                    else:
+                        # 1. Pending userlar bormi? (To'plangan)
+                        pending_count = database.get_pending_count()
+                        
+                        if pending_count > 0:
+                            logger.info(f"📋 Pending userlar mavjud: {pending_count} ta. Bazadan olinmoqda...")
+                            pending_users = database.get_pending_users(20)
+                            
+                            # Ularni follow qilish
+                            count = 0
+                            for user in pending_users:
+                                if bot.follow_user(user):
+                                    count += 1
+                                    # Statusni update qilish (pending -> waiting)
+                                    # follow_user ichida add_user chaqiriladi, u update qiladi yoki ignore
+                                    # Lekin statusni waiting ga o'tkazish kerak
+                                    try:
+                                        with database.get_connection() as conn:
+                                            conn.execute("UPDATE users SET status = 'waiting', followed_at = ? WHERE username = ?", 
+                                                       (datetime.now(), user))
+                                            conn.commit()
+                                    except:
+                                        pass
+                                        
+                            logger.info(f"✅ Pending userlardan {count} tasi follow qilindi")
+                            
+                        else:
+                            # 2. Yo'q bo'lsa - Deep Scroll
+                            logger.info("🔍 Pending userlar yo'q, yangi qidirilmoqda...")
+                            bot.run_follow_cycle(20)
+                            
+                        bot.show_stats()
+                        
+                        # 3. Unfollow sikli
+                        bot.check_and_unfollow()
+                        bot.show_stats()
+                    
+                    # Dam olish
+                    wait_time = random.randint(3600, 7200) 
+                    logger.info(f"⏳ Sikl tugadi. {wait_time/60:.1f} daqiqa kutilmoqda dam olish uchun...")
+                    
+                    # Kutish davomida buyruqlarni tekshirish (har 10 sekund)
+                    slept = 0
+                    while slept < wait_time:
+                        time.sleep(10)
+                        slept += 10
+                        # Agar collect buyrug'i kelsa - kutishni to'xtatish
+                        if telegram_bot.state.current_cycle == 'collect':
+                            logger.info("📥 Collect buyrug'i qabul qilindi! Kutish to'xtatildi.")
+                            break
+                            
+                except Exception as e:
+                    logger.error(f"❌ Main loop xatosi: {e}")
+                    time.sleep(60)
                 
         except KeyboardInterrupt:
             logger.info("⚠️ To'xtatildi")

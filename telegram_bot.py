@@ -78,6 +78,8 @@ class BotState:
     current_cycle = None
     last_action = None
     instagram_bot = None
+    collect_target = None
+    collect_count = 1000
 
 state = BotState()
 
@@ -377,6 +379,8 @@ async def cmd_collect(message: Message):
 <i>Progress Koyeb loglarida ko'rinadi.</i>""")
     
     state.current_cycle = "collect"
+    state.collect_target = target
+    state.collect_count = count
 
 @router.message(Command("pending"))
 async def cmd_pending(message: Message):
