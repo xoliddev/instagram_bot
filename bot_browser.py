@@ -24,6 +24,7 @@ except ImportError:
 
 import config
 import keep_alive
+import database
 
 # Colorama init
 init(autoreset=True)
@@ -44,88 +45,13 @@ class InstagramBrowserBot:
     """Instagram bot - brauzer orqali ishlaydi"""
     
     def __init__(self):
-        self.following_data = self._load_following_data()
-        self.daily_follow_count = 0
-        self.daily_unfollow_count = 0
-        self.last_reset_date = datetime.now().date()
+        # Baza ishga tushirish
+        database.init_db()
         self.playwright = None
         self.browser = None
         self.context = None
         self.page = None
         
-    def _load_following_data(self) -> dict:
-        """Bazadan yuklab olish"""
-        if Path(config.FOLLOWING_DB).exists():
-            try:
-                with open(config.FOLLOWING_DB, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    
-                    # Daily statistikalarni tiklash
-                    if "daily" in data:
-                         try:
-                             saved_date = datetime.fromisoformat(data["daily"]["date"]).date()
-                             if saved_date == datetime.now().date():
-                                 self.daily_follow_count = data["daily"]["follow_count"]
-                                 self.daily_unfollow_count = data["daily"]["unfollow_count"]
-                                 self.last_reset_date = saved_date
-                                 logger.info(f"📅 Bugungi statistika tiklandi: {self.daily_follow_count} follow, {self.daily_unfollow_count} unfollow")
-                         except Exception as e:
-                             logger.warning(f"⚠️ Daily stats error: {e}")
-                    
-                    # Compatibility (eski format uchun)
-                    if "following" not in data:
-                        return {"following": data, "stats": {"total_followed": 0, "total_unfollowed": 0, "followed_back": 0}}
-                        
-                    logger.info(f"📂 Bazadan {len(data.get('following', {}))} ta yozuv yuklandi")
-                    return data
-            except Exception as e:
-                logger.error(f"❌ Baza yuklash xatosi: {e}")
-                pass
-        return {"following": {}, "stats": {"total_followed": 0, "total_unfollowed": 0, "followed_back": 0}}
-    
-    def _save_following_data(self):
-        """Bazaga saqlash"""
-        data_to_save = {
-            "following": self.following_data.get("following", {}),
-            "stats": self.following_data.get("stats", {"total_followed": 0, "total_unfollowed": 0, "followed_back": 0}),
-            "daily": {
-                "date": self.last_reset_date.isoformat(),
-                "follow_count": self.daily_follow_count,
-                "unfollow_count": self.daily_unfollow_count
-            }
-        }
-        with open(config.FOLLOWING_DB, 'w', encoding='utf-8') as f:
-            json.dump(data_to_save, f, indent=2, ensure_ascii=False)
-    
-    def _reset_daily_counters(self):
-        """Kunlik hisoblagichlarni qayta o'rnatish"""
-        today = datetime.now().date()
-        if today > self.last_reset_date:
-            self.daily_follow_count = 0
-            self.daily_unfollow_count = 0
-            self.last_reset_date = today
-            logger.info(f"{Fore.CYAN}📊 Yangi kun! Hisoblagichlar qayta o'rnatildi")
-    
-    def is_night_time(self) -> bool:
-        """Tungi vaqtmi?"""
-        hour = datetime.now().hour
-        if config.NIGHT_REST_START < config.NIGHT_REST_END:
-            return config.NIGHT_REST_START <= hour < config.NIGHT_REST_END
-        else:
-            return config.NIGHT_REST_START <= hour or hour < config.NIGHT_REST_END
-    
-    def wait_until_morning(self):
-        """Tongga qadar kutish"""
-        now = datetime.now()
-        if now.hour >= config.NIGHT_REST_START:
-            wake = (now + timedelta(days=1)).replace(hour=config.NIGHT_REST_END, minute=0, second=0)
-        else:
-            wake = now.replace(hour=config.NIGHT_REST_END, minute=0, second=0)
-        
-        wait_sec = (wake - now).total_seconds()
-        logger.info(f"🌙 Tungi dam olish. Uyg'onish: {wake.strftime('%H:%M')} ({wait_sec/3600:.1f} soat)")
-        time.sleep(wait_sec)
-    
     def get_human_delay(self, min_sec: int, max_sec: int) -> int:
         """Insoniy vaqt oralig'i"""
         mean = (min_sec + max_sec) / 2
@@ -151,17 +77,6 @@ class InstagramBrowserBot:
                 viewport={"width": 1280, "height": 800},
                 locale="en-US"
             )
-            
-            # 🍪 Cookie'larni yuklash (Koyeb uchun)
-            cookie_file = Path("playwright_cookies.json")
-            if cookie_file.exists():
-                try:
-                    with open(cookie_file, 'r', encoding='utf-8') as f:
-                        cookies = json.load(f)
-                        self.context.add_cookies(cookies)
-                        logger.info(f"🍪 {len(cookies)} ta cookie yuklandi")
-                except Exception as e:
-                    logger.error(f"❌ Cookie yuklash xatosi: {e}")
             
             # 🍪 Cookie'larni yuklash (Koyeb uchun)
             cookie_file = Path("playwright_cookies.json")
@@ -331,18 +246,17 @@ class InstagramBrowserBot:
     
     def follow_user(self, username: str) -> bool:
         """Foydalanuvchini follow qilish"""
-        self._reset_daily_counters()
         
-        if self.is_night_time():
-            self.wait_until_morning()
-        
-        if self.daily_follow_count >= config.DAILY_FOLLOW_LIMIT:
-            logger.warning(f"⚠️ Kunlik limit tugadi")
+        # Limit tekshirish
+        daily_follow, _ = database.get_today_stats()
+        if daily_follow >= config.DAILY_FOLLOW_LIMIT:
+            logger.warning(f"⚠️ Kunlik limit tugadi ({daily_follow})")
             return False
         
         # Bazada bormi?
-        if username in [d["username"] for d in self.following_data["following"].values()]:
-            logger.info(f"⏭️ @{username} allaqachon bazada")
+        user = database.get_user(username)
+        if user:
+            logger.info(f"⏭️ @{username} allaqachon bazada (Status: {user['status']})")
             return False
         
         try:
@@ -355,6 +269,7 @@ class InstagramBrowserBot:
             
             if not follow_btn.is_visible():
                 logger.info(f"⏭️ @{username} allaqachon follow qilingan yoki mavjud emas")
+                database.add_user(username) # Bazaga qo'shib qo'yamiz
                 return False
             
             # Follow bosish
@@ -373,20 +288,13 @@ class InstagramBrowserBot:
             except Exception as e:
                 pass
             
-            # Bazaga yozish
-            user_id = username  # Brauzer versiyada username ni ID sifatida ishlatamiz
-            self.following_data["following"][user_id] = {
-                "username": username,
-                "followed_at": datetime.now().isoformat(),
-                "status": "waiting",
-                "checked": False
-            }
-            self.following_data["stats"]["total_followed"] += 1
-            self._save_following_data()
-            
-            self.daily_follow_count += 1
-            logger.info(f"{Fore.GREEN}✅ Follow: @{username} [{self.daily_follow_count}/{config.DAILY_FOLLOW_LIMIT}]")
-            return True
+            # Bazaga yozish (SQLite)
+            if database.add_user(username):
+                daily_follow, _ = database.get_today_stats()
+                logger.info(f"{Fore.GREEN}✅ Follow: @{username} [{daily_follow}/{config.DAILY_FOLLOW_LIMIT}]")
+                return True
+            else:
+                return False
             
         except Exception as e:
             logger.error(f"❌ Follow xatosi @{username}: {e}")
@@ -395,7 +303,6 @@ class InstagramBrowserBot:
     def get_my_followers(self) -> set:
         """O'z followerlarimizni olish"""
         logger.info("📊 O'z followerlarimiz tekshirilmoqda...")
-        
         try:
             # O'z profilga o'tish
             self.page.goto(f"https://www.instagram.com/{config.INSTAGRAM_USERNAME}/", wait_until="domcontentloaded", timeout=60000)
@@ -423,23 +330,19 @@ class InstagramBrowserBot:
                     except:
                         continue
                 
-                # Scroll - keyboard usuli
+                # Scroll
                 try:
-                    dialog.click()
-                    self.page.keyboard.press("PageDown")
-                    time.sleep(1)
-                    self.page.keyboard.press("PageDown")
+                     dialog = self.page.locator('div[role="dialog"]').first
+                     self.page.mouse.wheel(0, 3000)
+                     time.sleep(1)
                 except:
-                    dialog.evaluate("el => el.scrollTop += 500")
+                    pass
                 
                 scroll_count += 1
-                
-                # Yangi follower qo'shilmadimi?
                 if len(followers) == prev_count:
                     break
                 prev_count = len(followers)
             
-            # Dialogni yopish
             self.page.keyboard.press("Escape")
             time.sleep(1)
             
@@ -454,29 +357,28 @@ class InstagramBrowserBot:
         """24 soat o'tganlarni tekshirish va unfollow qilish"""
         logger.info("🔍 24 soat tekshiruvi boshlanmoqda...")
         
+        waiting_users = database.get_waiting_users()
+        if not waiting_users:
+            logger.info("✅ Tekshiradiganlar yo'q")
+            return
+
         my_followers = self.get_my_followers()
         now = datetime.now()
         to_unfollow = []
         
-        for user_id, data in list(self.following_data["following"].items()):
-            if data.get("status") != "waiting":
-                continue
-            
-            followed_at = datetime.fromisoformat(data["followed_at"])
+        for user in waiting_users:
+            followed_at = datetime.fromisoformat(user['followed_at'])
             hours = (now - followed_at).total_seconds() / 3600
             
             if hours >= 24:
-                username = data["username"]
+                username = user['username']
                 
                 if username in my_followers:
                     logger.info(f"{Fore.GREEN}✅ @{username} follow qaytardi!")
-                    self.following_data["following"][user_id]["status"] = "followed_back"
-                    self.following_data["stats"]["followed_back"] += 1
+                    database.update_status(username, 'followed_back')
                 else:
                     to_unfollow.append(username)
                     logger.info(f"{Fore.YELLOW}❌ @{username} follow qaytarmagan ({hours:.1f} soat)")
-        
-        self._save_following_data()
         
         # Unfollow
         for username in to_unfollow:
@@ -487,12 +389,9 @@ class InstagramBrowserBot:
     
     def unfollow_user(self, username: str) -> bool:
         """Foydalanuvchini unfollow qilish"""
-        self._reset_daily_counters()
         
-        if self.is_night_time():
-            self.wait_until_morning()
-        
-        if self.daily_unfollow_count >= config.DAILY_UNFOLLOW_LIMIT:
+        _, daily_unfollow = database.get_today_stats()
+        if daily_unfollow >= config.DAILY_UNFOLLOW_LIMIT:
             logger.warning(f"⚠️ Kunlik unfollow limiti tugadi")
             return False
         
@@ -506,6 +405,7 @@ class InstagramBrowserBot:
             
             if not following_btn.is_visible():
                 logger.info(f"⏭️ @{username} allaqachon unfollow qilingan")
+                database.update_status(username, 'unfollowed') # Bazani to'g'irlash
                 return False
             
             # Following tugmasini bosish
@@ -518,17 +418,10 @@ class InstagramBrowserBot:
             time.sleep(2)
             
             # Bazani yangilash
-            for user_id, data in self.following_data["following"].items():
-                if data["username"] == username:
-                    self.following_data["following"][user_id]["status"] = "unfollowed"
-                    self.following_data["following"][user_id]["unfollowed_at"] = datetime.now().isoformat()
-                    break
+            database.update_status(username, 'unfollowed')
             
-            self.following_data["stats"]["total_unfollowed"] += 1
-            self._save_following_data()
-            
-            self.daily_unfollow_count += 1
-            logger.info(f"{Fore.RED}🚫 Unfollow: @{username} [{self.daily_unfollow_count}/{config.DAILY_UNFOLLOW_LIMIT}]")
+            _, daily_unfollow = database.get_today_stats()
+            logger.info(f"{Fore.RED}🚫 Unfollow: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
             return True
             
         except Exception as e:
@@ -540,9 +433,6 @@ class InstagramBrowserBot:
         logger.info(f"\n{'='*50}")
         logger.info("🚀 FOLLOW SIKLI BOSHLANDI")
         logger.info(f"{'='*50}\n")
-        
-        if self.is_night_time():
-            self.wait_until_morning()
         
         users = self.get_followers_of_target(count)
         
@@ -562,21 +452,18 @@ class InstagramBrowserBot:
     
     def show_stats(self):
         """Statistika"""
-        total = len(self.following_data["following"])
-        waiting = sum(1 for d in self.following_data["following"].values() if d.get("status") == "waiting")
-        backed = sum(1 for d in self.following_data["following"].values() if d.get("status") == "followed_back")
-        unfollowed = sum(1 for d in self.following_data["following"].values() if d.get("status") == "unfollowed")
+        total, waiting, backed = database.get_total_stats()
+        d_follow, d_unfollow = database.get_today_stats()
         
         print(f"\n{Fore.CYAN}{'='*50}")
-        print(f"{Fore.YELLOW}📊 STATISTIKA")
+        print(f"{Fore.YELLOW}📊 STATISTIKA (SQLite)")
         print(f"{Fore.CYAN}{'='*50}")
-        print(f"{Fore.WHITE}📝 Jami: {Fore.GREEN}{total}")
+        print(f"{Fore.WHITE}📝 Jami bazada: {Fore.GREEN}{total}")
         print(f"{Fore.WHITE}⏳ Kutilmoqda: {Fore.YELLOW}{waiting}")
         print(f"{Fore.WHITE}✅ Qaytardi: {Fore.GREEN}{backed}")
-        print(f"{Fore.WHITE}🚫 Unfollow: {Fore.RED}{unfollowed}")
         print(f"{Fore.CYAN}{'='*50}")
-        print(f"{Fore.WHITE}📅 Bugun follow: {self.daily_follow_count}/{config.DAILY_FOLLOW_LIMIT}")
-        print(f"{Fore.WHITE}📅 Bugun unfollow: {self.daily_unfollow_count}/{config.DAILY_UNFOLLOW_LIMIT}")
+        print(f"{Fore.WHITE}📅 Bugun follow: {d_follow}/{config.DAILY_FOLLOW_LIMIT}")
+        print(f"{Fore.WHITE}📅 Bugun unfollow: {d_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}")
         print(f"{Fore.CYAN}{'='*50}\n")
     
     def close(self):
@@ -597,9 +484,8 @@ def main():
 
     print(f"""
 {Fore.CYAN}╔══════════════════════════════════════════════════════════════╗
-{Fore.CYAN}║{Fore.YELLOW}     📸 INSTAGRAM BOT (BROWSER VERSION)                       {Fore.CYAN}║
-{Fore.CYAN}║{Fore.WHITE}     Brauzer orqali ishlaydi - xavfsiz!                        {Fore.CYAN}║
-{Fore.CYAN}║{Fore.WHITE}     🌙 Tungi dam olish: 00:00 - 07:00                          {Fore.CYAN}║
+{Fore.CYAN}║{Fore.YELLOW}     📸 INSTAGRAM BOT (BROWSER + SQLITE)                      {Fore.CYAN}║
+{Fore.CYAN}║{Fore.WHITE}     24/7 Avtomatik rejim (Uyqusiz!)                           {Fore.CYAN}║
 {Fore.CYAN}╚══════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
     """)
     
@@ -635,20 +521,22 @@ def main():
         
         try:
             while True:
-                if bot.is_night_time():
-                    bot.wait_until_morning()
+                # Tungi rejim OLIB TASHLANDI
+                # Bot endi 24/7 ishlaydi, faqat oraliq vaqtlar (delay) bilan.
                 
                 # 1. Follow sikli
                 bot.run_follow_cycle(20)
                 bot.show_stats()
                 
-                # 2. Unfollow sikli (24 soat o'tganlarni)
+                # 2. Unfollow sikli
                 bot.check_and_unfollow()
                 bot.show_stats()
                 
-                # 3. Kutish (1 soat)
-                logger.info("⏳ Sikl tugadi. 1 soat kutilmoqda...")
-                time.sleep(3600)
+                # 3. Kutish (Random 1-2 soat)
+                # Odamga o'xshash uchun qat'iy 1 soat emas, random qilamiz
+                wait_time = random.randint(3600, 7200) 
+                logger.info(f"⏳ Sikl tugadi. {wait_time/60:.1f} daqiqa kutilmoqda dam olish uchun...")
+                time.sleep(wait_time)
                 
         except KeyboardInterrupt:
             logger.info("⚠️ To'xtatildi")
@@ -661,7 +549,7 @@ def main():
         while True:
             print(f"""
 {Fore.CYAN}┌───────────────────────────────────────┐
-{Fore.CYAN}│{Fore.YELLOW} 🎮 MENYU                              {Fore.CYAN}│
+{Fore.CYAN}│{Fore.YELLOW} 🎮 MENYU (SQLite)                     {Fore.CYAN}│
 {Fore.CYAN}├───────────────────────────────────────┤
 {Fore.CYAN}│{Fore.WHITE} 1. 🚀 Follow siklini boshlash         {Fore.CYAN}│
 {Fore.CYAN}│{Fore.WHITE} 2. 🔍 24 soat tekshirish + unfollow   {Fore.CYAN}│
@@ -686,17 +574,15 @@ def main():
                 print(f"{Fore.RED}To'xtatish: Ctrl+C\n")
                 
                 while True:
-                    if bot.is_night_time():
-                        bot.wait_until_morning()
-                    
+                    # Tungi rejim yo'q
                     bot.run_follow_cycle(20)
                     bot.show_stats()
-                    
                     bot.check_and_unfollow()
                     bot.show_stats()
                     
-                    logger.info("⏳ 1 soat kutilmoqda...")
-                    time.sleep(3600)
+                    wait_time = random.randint(3600, 7200) 
+                    logger.info(f"⏳ {wait_time/60:.1f} daqiqa kutilmoqda...")
+                    time.sleep(wait_time)
                     
             elif choice == "4":
                 bot.show_stats()
