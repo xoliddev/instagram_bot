@@ -164,18 +164,32 @@ async def cmd_logs(message: Message):
     if not is_admin(message.from_user.id):
         return
     
-    if not LOG_FILE.exists():
-        await message.answer("📜 Log fayl topilmadi.")
-        return
+    # Log fayllarni tekshirish
+    log_files = [Path("bot.log"), Path("/tmp/bot.log"), Path("logs/bot.log")]
+    log_content = None
     
-    try:
-        with open(LOG_FILE, 'r', encoding='utf-8') as f:
-            lines = f.readlines()[-20:]  # Oxirgi 20 qator
-        
-        text = "📜 <b>Oxirgi loglar:</b>\n\n<code>" + "".join(lines)[-3500:] + "</code>"
-        await message.answer(text)
-    except Exception as e:
-        await message.answer(f"❌ Xato: {e}")
+    for log_file in log_files:
+        if log_file.exists():
+            try:
+                with open(log_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()[-20:]
+                log_content = "".join(lines)
+                break
+            except:
+                continue
+    
+    if log_content:
+        text = "📜 <b>Oxirgi loglar:</b>\n\n<code>" + log_content[-3500:] + "</code>"
+    else:
+        text = """📜 <b>Log fayl topilmadi</b>
+
+<i>Loglarni ko'rish uchun:</i>
+1. Koyeb Dashboard → Console
+2. Runtime Logs qismida ko'ring
+
+<i>Yoki /stats buyrug'i bilan statistikani ko'ring.</i>"""
+    
+    await message.answer(text)
 
 @router.message(Command("targets"))
 async def cmd_targets(message: Message):

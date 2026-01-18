@@ -231,17 +231,40 @@ class InstagramBrowserBot:
                     logger.info(f"✅ Yetarlicha yangi user topildi: {len(users)} ta")
                     break
                 
-                # Scroll - Mouse Wheel usuli
+                # Scroll - JavaScript usuli (ishonchliroq)
                 try:
-                    box = dialog.bounding_box()
-                    if box:
-                        self.page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-                        self.page.mouse.wheel(0, 5000)
-                        logger.info(f"🖱️ Scroll qilinmoqda... ({len(users)}/{count} topildi)")
-                    else:
-                        dialog.evaluate("el => el.scrollTop += 1500")
-                        
-                    time.sleep(3) # Loading...
+                    # Dialog ichidagi scrollable container ni topish
+                    scroll_success = dialog.evaluate("""(el) => {
+                        // Instagram dialog scrollable containerlarini topish
+                        const scrollables = el.querySelectorAll('[style*="overflow"]');
+                        let scrolled = false;
+                        for (const s of scrollables) {
+                            const before = s.scrollTop;
+                            s.scrollTop += 800;
+                            if (s.scrollTop > before) {
+                                scrolled = true;
+                                break;
+                            }
+                        }
+                        // Agar container topilmasa, dialog o'zini scroll qilish
+                        if (!scrolled) {
+                            const before = el.scrollTop;
+                            el.scrollTop += 800;
+                            scrolled = el.scrollTop > before;
+                        }
+                        return scrolled;
+                    }""")
+                    
+                    if not scroll_success:
+                        # Fallback: Mouse wheel
+                        box = dialog.bounding_box()
+                        if box:
+                            self.page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+                            self.page.mouse.wheel(0, 5000)
+                    
+                    logger.info(f"🖱️ Scroll #{scroll_count}: {len(users)}/{count} topildi")
+                    time.sleep(2)  # Loading kutish
+                    
                 except Exception as e:
                     logger.warning(f"⚠️ Scroll xatosi: {e}")
                 
