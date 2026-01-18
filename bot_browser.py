@@ -26,6 +26,8 @@ import config
 import keep_alive
 import database
 import migrate_json_to_sqlite
+import telegram_bot # State uchun
+
 
 # Colorama init
 init(autoreset=True)
@@ -915,12 +917,9 @@ def main():
         
         try:
                 try:
-                    # 1. Telegram buyruqlarini tekshirish
-                    try:
-                        import telegram_bot
-                        # Buyruqlarni state orqali o'qish (telegram_bot.py da set qilinadi)
-                    except:
-                        pass
+                    # 1. State tekshirish
+                    logger.info(f"🔄 CYCLE CHECK: {telegram_bot.state.current_cycle} (Target: {telegram_bot.state.collect_target})")
+
                         
                     # ==========================================
                     # ♻️ SIKL TURLARI BO'YICHA ISHLASH
