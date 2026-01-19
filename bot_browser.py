@@ -1127,6 +1127,20 @@ def main():
                         database.set_config("current_cycle", "auto")
 
                     # ------------------------------------------
+                    # MODE 3: STORIES (Faqat Story ko'rish)
+                    # ------------------------------------------
+                    elif current_cycle == 'stories':
+                        logger.info(f"\n{'='*40}")
+                        logger.info("🍿 STORY MODE BOSHLANDI")
+                        logger.info(f"{'='*40}")
+                        
+                        # 1 soat davomida story ko'rish (yoki tugaguncha)
+                        bot.watch_stories_and_like(3600)
+                        
+                        logger.info("✅ Story ko'rish tugadi. Auto rejimga qaytilmoqda.")
+                        database.set_config("current_cycle", "auto")
+
+                    # ------------------------------------------
                     # MODE 3: AUTO (Faqat Baza bilan ishlash)
                     # ------------------------------------------
                     else:

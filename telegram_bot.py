@@ -351,6 +351,14 @@ async def cmd_cleanup(message: Message):
     await message.answer("🧹 Following tozalash sikli boshlanmoqda...\n\n<i>Sizga follow qilmaganlar unfollow qilinadi.</i>")
     database.set_config("current_cycle", "cleanup")
 
+@router.message(Command("stories"))
+async def cmd_stories(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+    
+    await message.answer("🍿 <b>Story tomosha qilish boshlanmoqda...</b>\n\nBot barcha storylarni birma-bir ko'rib, random like bosib chiqadi.\nStorylar tugagach, avtomatik to'xtaydi.")
+    database.set_config("current_cycle", "stories")
+
 @router.message(Command("collect"))
 async def cmd_collect(message: Message):
     """Followerlarni bazaga to'plash"""
