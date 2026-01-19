@@ -884,17 +884,25 @@ class InstagramBrowserBot:
                 # Usernameni aniqlash
                 current_username = "Noma'lum"
                 try:
-                     # 1-usul: Header dagi link
-                     user_el = self.page.locator('header a').first
-                     if user_el.is_visible():
-                         current_username = user_el.inner_text()
+                     # 1-usul (Eng ishonchli): URL dan olish
+                     # URL formati: https://www.instagram.com/stories/username/123456789/
+                     url = self.page.url
+                     match = re.search(r"stories/([^/]+)/", url)
+                     if match:
+                         current_username = match.group(1)
                      
-                     # 2-usul: Agar topilmasa, header textlari
+                     # 2-usul: Header dagi link (Fallback)
+                     if current_username == "Noma'lum":
+                         user_el = self.page.locator('header a').first
+                         if user_el.is_visible():
+                             current_username = user_el.inner_text()
+                     
+                     # 3-usul: Header texti
                      if current_username == "Noma'lum":
                          header_text = self.page.locator('header').first.inner_text()
                          lines = header_text.split('\n')
                          if lines:
-                             current_username = lines[0] # Birinchi qator odatda username
+                             current_username = lines[0]
                 except:
                     pass
 
