@@ -775,7 +775,9 @@ class InstagramBrowserBot:
             # 24 soatlik himoya va Status tekshiruvi w
             user_data = database.get_user(username)
             if user_data:
-                # 1. Agar statusi 'followed_back' bo'lsa (lekin followers listda ko'rinmasa ham)
+                user_data = dict(user_data) # Fix: sqlite3.Row -> dict conversion
+                
+                # 1. Agar statusi 'followed_back' bo'lsa
                 if user_data.get('status') == 'followed_back':
                      logger.info(f"⏭️ @{username} o'tkazib yuborildi (Status: followed_back)")
                      continue
@@ -852,7 +854,7 @@ class InstagramBrowserBot:
             try:
                 # Method 1: API orqali (Eng ishonchli)
                 profile_json_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
-                user_id = self.page.evaluate(f"""async () => {{
+                user_info = self.page.evaluate(f"""async () => {{
                     try {{
                         const resp = await fetch("{profile_json_url}", {{
                             headers: {{ 
@@ -861,9 +863,21 @@ class InstagramBrowserBot:
                             }}
                         }});
                         const data = await resp.json();
-                        return data.data.user.id;
+                        return {{
+                            id: data.data.user.id,
+                            follows_viewer: data.data.user.follows_viewer
+                        }};
                     }} catch(e) {{ return null; }}
                 }}""")
+                
+                if user_info and user_info.get('id'):
+                    user_id = user_info['id']
+                    
+                    # ⚠️ CRITICAL: Agar u bizga follow qilgan bo'lsa - UNFOLLOW QILMAYMIZ!
+                    if user_info.get('follows_viewer') is True:
+                         logger.warning(f"🛑 @{username} sizga follow qilgan! (Unfollow bekor qilindi)")
+                         database.update_status(username, 'followed_back')
+                         return False
                 
                 # Method 2: Meta taglardan (Fallback)
                 if not user_id:
