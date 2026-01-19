@@ -1313,6 +1313,7 @@ class InstagramBrowserBot:
             followers_count = 0
             scroll_count = 0
             prev_count = 0
+            retry_attempts = 0 # Initialize retry counter
             MAX_SCROLLS = 100 # Katta limit (barchasini olish uchun)
             
             while scroll_count < MAX_SCROLLS:
@@ -1336,18 +1337,30 @@ class InstagramBrowserBot:
                 try:
                      dialog = self.page.locator('div[role="dialog"]').first
                      self.page.evaluate("arguments[0].scrollTop += 3000", dialog.element_handle())
-                     time.sleep(1)
+                     time.sleep(2) # Stabilroq ishlash uchun 2s
                 except:
                     pass
                 
                 scroll_count += 1
+                
+                # Agar o'zgarish bo'lmasa - Retry
                 if followers_count == prev_count:
-                    time.sleep(2)
-                    # Qayta tekshirish
-                    follower_links = self.page.locator('div[role="dialog"] a[href^="/"]')
-                    if follower_links.count() == prev_count:
-                        logging.info("✅ Ro'yxat oxiriga yetildi.")
+                    retry_attempts += 1
+                    logger.info(f"⏳ Yuklanmoqda... ({retry_attempts}/3)")
+                    time.sleep(4) # Katta pauza
+                    
+                    # Yana bir scroll qilib ko'rish
+                    try:
+                        self.page.evaluate("arguments[0].scrollTop += 1000", dialog.element_handle())
+                    except: 
+                        pass
+                        
+                    if retry_attempts >= 3:
+                        logging.info("✅ Ro'yxat oxiriga yetildi (yoki yuklanmayapti).")
                         break
+                else:
+                    retry_attempts = 0 # O'zgarish bo'lsa - retry ni reset qilamiz
+                
                 prev_count = followers_count
                 
                 if scroll_count % 5 == 0:
