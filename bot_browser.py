@@ -502,6 +502,7 @@ class InstagramBrowserBot:
         
         try:
             # Profilga o'tish
+            logger.info(f"🔍 Profilga kirilmoqda: @{username}")
             self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=60000)
             time.sleep(2)
             

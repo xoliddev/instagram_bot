@@ -19,6 +19,16 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
+# Filter: Telegram Conflict xatolarini yashirish
+class TelegramConflictFilter(logging.Filter):
+    def filter(self, record):
+        return "Conflict: terminated by other getUpdates request" not in record.getMessage()
+
+# Filter ni root loggerga qo'shish
+logging.getLogger().addFilter(TelegramConflictFilter())
+logging.getLogger("aiogram").addFilter(TelegramConflictFilter())
+
 logger = logging.getLogger(__name__)
 
 def auto_restore_database():
