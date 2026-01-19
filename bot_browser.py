@@ -1019,6 +1019,12 @@ class InstagramBrowserBot:
         
         start_time = time.time()
         
+        # IMMEDIATE CHECK: Agar buyruq allaqachon o'zgargan bo'lsa, hech narsa qilmaymiz
+        current_check = database.get_config("current_cycle", "auto")
+        if current_check != initial_cycle and current_check != "auto":
+            logger.info(f"⚡ Story o'tkazib yuborildi (Yangi buyruq: {current_check})")
+            return
+        
         try:
             # 1. Bosh sahifaga o'tish
             if self.page.url != "https://www.instagram.com/":
