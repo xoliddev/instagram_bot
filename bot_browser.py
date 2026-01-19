@@ -1380,6 +1380,11 @@ def main():
                     # ------------------------------------------
                     # DAM OLISH & BUYRUQLARNI KUTISH
                     # ------------------------------------------
+                    # Agar buyruq o'zgargan bo'lsa (masalan stories), uxlashga yotmaymiz!
+                    if database.get_config("current_cycle", "auto") != 'auto':
+                        logger.info("⚡ Sikl o'tkazib yuborilmoqda (Yangi buyruq uchun)")
+                        continue
+
                     wait_time = random.randint(3600, 7200) 
                     logger.info(f"⏳ Sikl tugadi. {wait_time/60:.1f} daqiqa kutilmoqda...")
                     
