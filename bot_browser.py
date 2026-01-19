@@ -1294,6 +1294,73 @@ class InstagramBrowserBot:
         print(f"{Fore.WHITE}📅 Bugun unfollow: {d_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}")
         print(f"{Fore.CYAN}{'='*50}\n")
     
+    def sync_my_followers(self):
+        """Startup: Barcha followerlarni bazaga muhrlash (Sync)"""
+        logger.info(f"\n{'='*50}")
+        logger.info("🔄 STARTUP SYNC: Barcha followerlar bazaga saqlanmoqda...")
+        logger.info(f"{'='*50}\n")
+        
+        try:
+            # 1. O'z profilga o'tish
+            self.page.goto(f"https://www.instagram.com/{config.INSTAGRAM_USERNAME}/", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(3)
+            
+            # 2. Followers tugmasini bosish
+            followers_link = self.page.locator('a[href$="/followers/"]').first
+            followers_link.click()
+            time.sleep(5)
+            
+            followers_count = 0
+            scroll_count = 0
+            prev_count = 0
+            MAX_SCROLLS = 100 # Katta limit (barchasini olish uchun)
+            
+            while scroll_count < MAX_SCROLLS:
+                follower_links = self.page.locator('div[role="dialog"] a[href^="/"]')
+                count = follower_links.count()
+                
+                for i in range(count):
+                    try:
+                        href = follower_links.nth(i).get_attribute("href")
+                        if href and href.startswith("/"):
+                            username = href.strip("/").split("/")[0]
+                            if username:
+                                # CRITICAL: Har birini bazaga yozamiz
+                                database.register_follower(username)
+                    except:
+                        pass
+                
+                followers_count = count
+                
+                # Scroll
+                try:
+                     dialog = self.page.locator('div[role="dialog"]').first
+                     self.page.evaluate("arguments[0].scrollTop += 3000", dialog.element_handle())
+                     time.sleep(1)
+                except:
+                    pass
+                
+                scroll_count += 1
+                if followers_count == prev_count:
+                    time.sleep(2)
+                    # Qayta tekshirish
+                    follower_links = self.page.locator('div[role="dialog"] a[href^="/"]')
+                    if follower_links.count() == prev_count:
+                        logging.info("✅ Ro'yxat oxiriga yetildi.")
+                        break
+                prev_count = followers_count
+                
+                if scroll_count % 5 == 0:
+                    logger.info(f"📊 Sync Progress: {followers_count} ta follower topildi...")
+            
+            logger.info(f"✅ SYNC TUGADI: Jami {followers_count} ta follower bazaga muhrlandi.")
+            # Dialogni yopish
+            self.page.keyboard.press("Escape")
+            time.sleep(1)
+            
+        except Exception as e:
+            logger.error(f"❌ Sync xatosi: {e}")
+
     def close(self):
         """Brauzerni yopish"""
         if self.context:
