@@ -787,17 +787,8 @@ class InstagramBrowserBot:
                      logger.info(f"⏭️ @{username} o'tkazib yuborildi (Status: followed_back)")
                      continue
                 
-                # 2. Agar 24 soat o'tmagan bo'lsa
-                if user_data.get('followed_at'):
-                    try:
-                        followed_at = datetime.fromisoformat(user_data['followed_at'])
-                        hours_diff = (datetime.now() - followed_at).total_seconds() / 3600
-                        if hours_diff < 24:
-                            logger.info(f"⏭️ @{username} o'tkazib yuborildi (Hali 24 soat bo'lmadi: {hours_diff:.1f}s)")
-                            time.sleep(0.1)
-                            continue
-                    except:
-                        pass
+                # 2. Cleanup rejimida 24 soatlik limit bekor qilinadi!
+                # Faqat "followed_back" bo'lmasa bo'ldi.
 
             try:
                 if self.unfollow_user(username):
