@@ -990,8 +990,14 @@ def main():
                                             conn.execute("UPDATE users SET status = 'waiting', followed_at = ? WHERE username = ?", 
                                                        (datetime.now(), user))
                                             conn.commit()
-                                    except:
-                                        pass
+                                        
+                                        # Human Delay (2-5 daqiqa)
+                                        delay = bot.get_human_delay(config.FOLLOW_DELAY_MIN, config.FOLLOW_DELAY_MAX)
+                                        logger.info(f"⏳ Keyingi followgacha: {delay} sekund...")
+                                        time.sleep(delay)
+
+                                    except Exception as e:
+                                        logger.error(f"❌ DB Update error: {e}")
                                         
                             logger.info(f"✅ Pending userlardan {count} tasi follow qilindi")
                             
