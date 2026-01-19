@@ -928,15 +928,23 @@ class InstagramBrowserBot:
 
                 time.sleep(watch_time)
                 
-                # Random Like (20-30% ehtimol)
-                if random.random() < 0.3:
+                # Random Like (50% ehtimol - ko'paytirildi)
+                if random.random() < 0.5:
                     try:
-                        like_btn = self.page.locator('svg[aria-label="Like"], svg[aria-label="J\'aime"], svg[aria-label="Нравится"]').locator("..").first
+                        # Like tugmasini qidirish
+                        like_btn = self.page.locator('span svg[aria-label="Like"], span svg[aria-label="J\'aime"], span svg[aria-label="Нравится"]').first
+                        if not like_btn.is_visible():
+                             # Fallback: Parent buttons
+                             like_btn = self.page.locator('button svg[aria-label="Like"]').first
+                        
                         if like_btn.is_visible():
                             like_btn.click()
                             logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
                             self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
                             time.sleep(1)
+                        else:
+                             # DEBUG: Nega topilmadi?
+                             pass
                     except:
                         pass
                 
