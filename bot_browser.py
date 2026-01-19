@@ -1211,6 +1211,11 @@ def main():
                             
                             count = 0
                             for user in pending_users:
+                                # 0. Buyruqni tekshirish (Tezkor chiqish)
+                                if database.get_config("current_cycle") not in ['auto', 'stories']: # Stories ham auto ning bir qismi
+                                     logger.info(f"⚡ Yangi buyruq keldi! Follow to'xtatildi.")
+                                     break
+
                                 if bot.follow_user(user):
                                     count += 1
                                     # Statusni update qilish (pending -> waiting)
