@@ -787,9 +787,18 @@ class InstagramBrowserBot:
             following_btn = header_section.locator('button').filter(has_text=re.compile(r"Following|Requested|Подписки|Запрос|Obuna bo‘lingan|So‘rov yuborilgan|Takip", re.IGNORECASE)).first
             
             if not following_btn.is_visible():
-                logger.info(f"⏭️ @{username} allaqachon unfollow qilingan (Tugma topilmadi)")
-                database.update_status(username, 'unfollowed') 
-                return False
+                # Balki allaqachon unfollow qilingandir? "Follow" tugmasi bormi?
+                follow_btn = header_section.locator('button').filter(has_text=re.compile(r"Follow|Obuna bo‘lish|Подписаться|Takip et", re.IGNORECASE)).first
+                
+                if follow_btn.is_visible():
+                    logger.info(f"info: ⏭️ @{username} allaqachon unfollow qilingan (Follow tugmasi bor)")
+                    database.update_status(username, 'unfollowed')
+                    return False
+                else:
+                    # DEBUG: Umuman tugma topilmadi?
+                    all_text = header_section.inner_text()
+                    logger.warning(f"⚠️ Headerda tugma topilmadi @{username}. Header text: {all_text.replace('\n', ' ')}")
+                    return False
             
             # Tugmani bosish
             following_btn.click(force=True)
