@@ -777,24 +777,34 @@ class InstagramBrowserBot:
             self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=60000)
             time.sleep(3)
             
-            # Universal "Following" tugmasini topish
-            # 1. Matn orqali (EN, RU, UZ...)
-            following_btn = self.page.locator('button').filter(has_text=re.compile(r"Following|Requested|Подписки|Запрос|Obuna bo‘lingan|So‘rov yuborilgan", re.IGNORECASE)).first
+            # Universal "Following" tugmasini topish (Header ichidan)
+            # 1. Matn orqali (EN, RU, UZ...) + Header context
+            header_section = self.page.locator('header section').first
+            if not header_section.is_visible():
+                header_section = self.page.locator('main header').first
             
-            # 2. Agar matn topilmasa, Icon orqali (SVG) ham urinib ko'rish kerak (kelajakda)
+            # Buttonni header ichidan qidiramiz
+            following_btn = header_section.locator('button').filter(has_text=re.compile(r"Following|Requested|Подписки|Запрос|Obuna bo‘lingan|So‘rov yuborilgan|Takip", re.IGNORECASE)).first
             
             if not following_btn.is_visible():
-                logger.info(f"⏭️ @{username} allaqachon unfollow qilingan")
+                logger.info(f"⏭️ @{username} allaqachon unfollow qilingan (Tugma topilmadi)")
                 database.update_status(username, 'unfollowed') 
                 return False
             
             # Tugmani bosish
-            following_btn.click()
+            following_btn.click(force=True)
             time.sleep(2)
             
             # "Unfollow" modal tugmasini bosish
-            # Regex kengaytirildi: EN, RU, UZ, TR
-            unfollow_btn = self.page.locator('div[role="dialog"] button').filter(has_text=re.compile(r"Unfollow|Отменить|Obunani bekor qilish|Takibi Bırak|Bekor qilish", re.IGNORECASE)).first
+            dialog = self.page.locator('div[role="dialog"]')
+            
+            # Agar dialog chiqmasa, yana bir marta bosib ko'rish
+            if not dialog.is_visible():
+                 following_btn.click(force=True)
+                 time.sleep(2)
+            
+            # Dialog ichidagi tugmani qidirish
+            unfollow_btn = dialog.locator('button').filter(has_text=re.compile(r"Unfollow|Отменить|Obunani bekor qilish|Takibi Bırak|Bekor qilish", re.IGNORECASE)).first
             
             if unfollow_btn.is_visible():
                 unfollow_btn.click()
@@ -809,16 +819,20 @@ class InstagramBrowserBot:
             else:
                 # DEBUG: Dialogdagi barcha tugmalarni ko'rish
                 try:
-                    all_btns = self.page.locator('div[role="dialog"] button').all_inner_texts()
-                    logger.warning(f"⚠️ Unfollow modali chiqmadi @{username}. Mavjud: {all_btns}")
-                    
-                    # Fallback: Agar "Отменить" so'zi qatnashgan bo'lsa (aniq match bo'lmasa ham)
-                    for btn_text in all_btns:
-                        if "otmenit" in btn_text.lower() or "bekor" in btn_text.lower() or "unfollow" in btn_text.lower():
-                            logger.info(f"🔄 Fallback Unfollow: {btn_text}")
-                            self.page.locator('div[role="dialog"] button').filter(has_text=btn_text).click()
-                            database.update_status(username, 'unfollowed')
-                            return True
+                    if dialog.is_visible():
+                        dialog_text = dialog.inner_text()
+                        all_btns = dialog.locator('button').all_inner_texts()
+                        logger.warning(f"⚠️ Unfollow modali: Tugma yo'q. Dialog matni: {dialog_text[:50]}... Tugmalar: {all_btns}")
+                        
+                        # Fallback: Agar "Отменить" yoki qizil rangli tugma bo'lsa
+                        for btn_text in all_btns:
+                            if "otmenit" in btn_text.lower() or "bekor" in btn_text.lower() or "unfollow" in btn_text.lower():
+                                logger.info(f"🔄 Fallback Unfollow: {btn_text}")
+                                dialog.locator('button').filter(has_text=btn_text).click()
+                                database.update_status(username, 'unfollowed')
+                                return True
+                    else:
+                        logger.warning(f"⚠️ Unfollow modali umuman chiqmadi @{username}")
                 except:
                     pass
                     
