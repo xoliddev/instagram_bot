@@ -884,22 +884,33 @@ class InstagramBrowserBot:
                 # Usernameni aniqlash
                 current_username = "Noma'lum"
                 try:
-                     # Header dagi username
-                     # Odatda header chap tomonda, rasm yonida bo'ladi
+                     # 1-usul: Header dagi link
                      user_el = self.page.locator('header a').first
                      if user_el.is_visible():
                          current_username = user_el.inner_text()
+                     
+                     # 2-usul: Agar topilmasa, header textlari
+                     if current_username == "Noma'lum":
+                         header_text = self.page.locator('header').first.inner_text()
+                         lines = header_text.split('\n')
+                         if lines:
+                             current_username = lines[0] # Birinchi qator odatda username
                 except:
                     pass
 
                 logger.info(f"👀 Story ko'rilmoqda: @{current_username} ({watch_time}s)")
                 
-                # Agar yangi user bo'lsa - Telegramga yozish
-                if current_username != "Noma'lum":
-                    # Keshda bormi?
-                    if not hasattr(self, 'last_seen_story_user') or self.last_seen_story_user != current_username:
-                         self.send_telegram_msg(f"👀 <b>Story ko'rilmoqda:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
-                         self.last_seen_story_user = current_username
+                # Telegramga yozish (Noma'lum bo'lsa ham)
+                # Keshda bormi?
+                if not hasattr(self, 'last_seen_story_user') or self.last_seen_story_user != current_username:
+                     msg_text = f"👀 <b>Story ko'rilmoqda:</b> "
+                     if current_username != "Noma'lum":
+                         msg_text += f"<a href='https://instagram.com/{current_username}'>@{current_username}</a>"
+                     else:
+                         msg_text += "<i>(Yashirin profi)</i>"
+                         
+                     self.send_telegram_msg(msg_text)
+                     self.last_seen_story_user = current_username
 
                 time.sleep(watch_time)
                 
