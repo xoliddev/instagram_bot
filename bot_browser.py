@@ -835,21 +835,33 @@ class InstagramBrowserBot:
                 logger.info(f"📨 API Response: {api_result}")
                 
                 # Natijani tekshirish
-                if api_result and api_result.get('status') == 'ok' and api_result.get('following') == False:
+                # Status 'ok' bo'lsa, demak so'rov ketdi. 'following' ba'zida None keladi.
+                if api_result and api_result.get('status') == 'ok':
+                    logger.info("✅ API javobi OK. Natijani tekshirish uchun sahifa yangilanmoqda...")
+                    
                     # Tasdiqlash: Sahifani yangilab, "Follow" tugmasi borligini tekshirish
-                    self.page.reload()
-                    time.sleep(2)
-                    
-                    header_section = self.page.locator('header section').first
-                    follow_btn = header_section.locator('button').filter(has_text=re.compile(r"Follow|Obuna bo'lish|Подписаться", re.IGNORECASE)).first
-                    
-                    if follow_btn.is_visible():
-                        database.update_status(username, 'unfollowed')
-                        _, daily_unfollow = database.get_today_stats()
-                        logger.info(f"{Fore.RED}🚫 Unfollow TASDIQLANDI: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
-                        return True
-                    else:
-                        logger.warning(f"⚠️ API muvaffaqiyatli dedi, lekin Follow tugmasi yo'q @{username}. UI ga o'tilmoqda...")
+                    try:
+                        self.page.reload()
+                        time.sleep(3)
+                        
+                        # Buttonni kengroq qidirish (nafaqat header ichida)
+                        follow_btn = self.page.locator('button').filter(has_text=re.compile(r"Follow|Obuna bo'lish|Подписаться|Takip et", re.IGNORECASE)).first
+                        
+                        if follow_btn.is_visible():
+                            database.update_status(username, 'unfollowed')
+                            _, daily_unfollow = database.get_today_stats()
+                            logger.info(f"{Fore.RED}🚫 Unfollow TASDIQLANDI: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
+                            return True
+                        else:
+                            # Balki hali ham "Following" tur gandir?
+                            following_check = self.page.locator('button').filter(has_text=re.compile(r"Following|Requested|Obuna bo'lingan", re.IGNORECASE)).first
+                            if following_check.is_visible():
+                                logger.warning(f"⚠️ API 'ok' dedi, lekin hali ham 'Following' turibdi @{username}")
+                            else:
+                                logger.warning(f"⚠️ Sahifada na Follow, na Following tugmasi topildi @{username}")
+                    except Exception as verify_error:
+                         logger.warning(f"⚠️ Verifikatsiya xatosi: {verify_error}")
+
                 else:
                     logger.warning(f"⚠️ API Unfollow muvaffaqiyatsiz @{username}: {api_result}. UI ga o'tilmoqda...")
             
