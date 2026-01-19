@@ -792,7 +792,8 @@ class InstagramBrowserBot:
             time.sleep(2)
             
             # "Unfollow" modal tugmasini bosish
-            unfollow_btn = self.page.locator('div[role="dialog"] button').filter(has_text=re.compile(r"Unfollow|Отменить|Obunani bekor qilish", re.IGNORECASE)).first
+            # Regex kengaytirildi: EN, RU, UZ, TR
+            unfollow_btn = self.page.locator('div[role="dialog"] button').filter(has_text=re.compile(r"Unfollow|Отменить|Obunani bekor qilish|Takibi Bırak|Bekor qilish", re.IGNORECASE)).first
             
             if unfollow_btn.is_visible():
                 unfollow_btn.click()
@@ -805,7 +806,21 @@ class InstagramBrowserBot:
                 logger.info(f"{Fore.RED}🚫 Unfollow: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
                 return True
             else:
-                logger.warning(f"⚠️ Unfollow modali chiqmadi @{username}")
+                # DEBUG: Dialogdagi barcha tugmalarni ko'rish
+                try:
+                    all_btns = self.page.locator('div[role="dialog"] button').all_inner_texts()
+                    logger.warning(f"⚠️ Unfollow modali chiqmadi @{username}. Mavjud: {all_btns}")
+                    
+                    # Fallback: Agar "Отменить" so'zi qatnashgan bo'lsa (aniq match bo'lmasa ham)
+                    for btn_text in all_btns:
+                        if "otmenit" in btn_text.lower() or "bekor" in btn_text.lower() or "unfollow" in btn_text.lower():
+                            logger.info(f"🔄 Fallback Unfollow: {btn_text}")
+                            self.page.locator('div[role="dialog"] button').filter(has_text=btn_text).click()
+                            database.update_status(username, 'unfollowed')
+                            return True
+                except:
+                    pass
+                    
                 return False
                 
         except Exception as e:
