@@ -162,6 +162,24 @@ def update_status(username, status):
     except Exception as e:
         logger.error(f"❌ DB Update status error: {e}")
 
+def register_follower(username):
+    """Followerni 'followed_back' statusi bilan saqlash (Upsert)"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # Agar user yo'q bo'lsa -> insert (followed_at=NULL)
+            # Agar bor bo'lsa -> faqat status update (followed_at o'zgarmaydi)
+            cursor.execute("""
+                INSERT INTO users (username, status, followed_at, checked)
+                VALUES (?, 'followed_back', NULL, 0)
+                ON CONFLICT(username) DO UPDATE SET status = 'followed_back'
+            """, (username,))
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"❌ DB Register follower error: {e}")
+        return False
+
 def get_waiting_users():
     """24 soat o'tganlarni olish uchun ro'yxat"""
     try:

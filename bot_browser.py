@@ -585,6 +585,8 @@ class InstagramBrowserBot:
                             username = href.strip("/").split("/")[0]
                             if username:
                                 followers.add(username)
+                                # CRITICAL: Har bir followerni bazaga "muhrlash"
+                                database.register_follower(username)
                     except:
                         continue
                 
@@ -598,7 +600,10 @@ class InstagramBrowserBot:
                 
                 scroll_count += 1
                 if len(followers) == prev_count:
-                    break
+                    # Agar o'zgarish bo'lmasa - kutib ko'rish
+                    time.sleep(2)
+                    if len(followers) == prev_count:
+                        break
                 prev_count = len(followers)
             
             self.page.keyboard.press("Escape")
