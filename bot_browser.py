@@ -1108,14 +1108,18 @@ class InstagramBrowserBot:
                             for i in range(count):
                                 svg = like_svgs.nth(i)
                                 if svg.is_visible():
-                                    # Parent (Button) ni olish
-                                    like_btn = svg.locator("..")
-                                    like_btn.click(force=True)
-                                    clicked = True
-                                    logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
-                                    self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
-                                    time.sleep(1)
-                                    break
+                                    try:
+                                        # Parent (Button) ni olish
+                                        like_btn = svg.locator("..")
+                                        like_btn.click(force=True)
+                                        clicked = True
+                                        logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
+                                        self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
+                                        time.sleep(1)
+                                        break
+                                    except Exception as click_err:
+                                        logger.warning(f"⚠️ Like tugmasini bosishda muammo (keyingisini ko'ramiz): {click_err}")
+                                        continue
                         
                         if not clicked:
                              # DEBUG: Tugma topilmadi
