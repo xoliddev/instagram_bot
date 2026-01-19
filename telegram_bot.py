@@ -340,16 +340,18 @@ async def cmd_unfollow(message: Message):
         await message.answer("⚠️ Bot allaqachon ishlayapti.")
         return
     
-    await message.answer("🧹 Unfollow (Cleanup) sikli boshlanmoqda...\n\nSizga follow qaytarmaganlar tozalanadi.")
+    await message.answer("🔍 Unfollow sikli boshlanmoqda...\n\n<i>24 soat o'tgan va follow qaytarmaganlar tozalanadi.</i>")
     database.set_config("current_cycle", "cleanup")
+    database.set_config("strict_mode", "false")
 
 @router.message(Command("cleanup"))
 async def cmd_cleanup(message: Message):
     if not is_admin(message.from_user.id):
         return
     
-    await message.answer("🧹 Following tozalash sikli boshlanmoqda...\n\n<i>Sizga follow qilmaganlar unfollow qilinadi.</i>")
+    await message.answer("🧹 <b>SHAFQATSIZ TOZALASH!</b>\n\n<i>24 soatga QARAMAY, follow qaytarmaganlarning hammasi tozalanadi!</i>")
     database.set_config("current_cycle", "cleanup")
+    database.set_config("strict_mode", "true")
 
 @router.message(Command("stories"))
 async def cmd_stories(message: Message):

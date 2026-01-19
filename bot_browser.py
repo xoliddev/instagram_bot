@@ -787,8 +787,9 @@ class InstagramBrowserBot:
                      logger.info(f"⏭️ @{username} o'tkazib yuborildi (Status: followed_back)")
                      continue
                 
-                # 2. 24 soatlik himoya (GENTLE CLEANUP)
-                if user_data.get('followed_at'):
+                # 2. 24 soatlik himoya (FAQAT GENTLE MODE UCHUN)
+                strict_mode = database.get_config("strict_mode", "false") == "true"
+                if not strict_mode and user_data.get('followed_at'):
                     try:
                         followed_at = datetime.fromisoformat(user_data['followed_at'])
                         hours_diff = (datetime.now() - followed_at).total_seconds() / 3600
