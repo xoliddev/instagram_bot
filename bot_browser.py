@@ -496,7 +496,7 @@ class InstagramBrowserBot:
         
         # Bazada bormi?
         user = database.get_user(username)
-        if user:
+        if user and user['status'] != 'pending':
             logger.info(f"⏭️ @{username} allaqachon bazada (Status: {user['status']})")
             return False
         
@@ -761,7 +761,8 @@ class InstagramBrowserBot:
         return result
     
     def unfollow_user(self, username: str) -> bool:
-        """Foydalanuvchini unfollow qilish"""
+        """Foydalanuvchini unfollow qilish (Universal Selectorlar)"""
+        import re
         
         _, daily_unfollow = database.get_today_stats()
         if daily_unfollow >= config.DAILY_UNFOLLOW_LIMIT:
@@ -771,32 +772,40 @@ class InstagramBrowserBot:
         try:
             # Profilga o'tish
             self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(2)
+            time.sleep(3)
             
-            # Following tugmasini topish (following bo'lsa)
-            following_btn = self.page.locator('button:has-text("Following")').first
+            # Universal "Following" tugmasini topish
+            # 1. Matn orqali (EN, RU, UZ...)
+            following_btn = self.page.locator('button').filter(has_text=re.compile(r"Following|Requested|Подписки|Запрос|Obuna bo‘lingan|So‘rov yuborilgan", re.IGNORECASE)).first
+            
+            # 2. Agar matn topilmasa, Icon orqali (SVG) ham urinib ko'rish kerak (kelajakda)
             
             if not following_btn.is_visible():
                 logger.info(f"⏭️ @{username} allaqachon unfollow qilingan")
-                database.update_status(username, 'unfollowed') # Bazani to'g'irlash
+                database.update_status(username, 'unfollowed') 
                 return False
             
-            # Following tugmasini bosish
+            # Tugmani bosish
             following_btn.click()
-            time.sleep(1)
-            
-            # Unfollow tugmasini bosish
-            unfollow_btn = self.page.locator('button:has-text("Unfollow")').first
-            unfollow_btn.click()
             time.sleep(2)
             
-            # Bazani yangilash
-            database.update_status(username, 'unfollowed')
+            # "Unfollow" modal tugmasini bosish
+            unfollow_btn = self.page.locator('div[role="dialog"] button').filter(has_text=re.compile(r"Unfollow|Отменить|Obunani bekor qilish", re.IGNORECASE)).first
             
-            _, daily_unfollow = database.get_today_stats()
-            logger.info(f"{Fore.RED}🚫 Unfollow: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
-            return True
-            
+            if unfollow_btn.is_visible():
+                unfollow_btn.click()
+                time.sleep(2)
+                
+                # Bazani yangilash
+                database.update_status(username, 'unfollowed')
+                
+                _, daily_unfollow = database.get_today_stats()
+                logger.info(f"{Fore.RED}🚫 Unfollow: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
+                return True
+            else:
+                logger.warning(f"⚠️ Unfollow modali chiqmadi @{username}")
+                return False
+                
         except Exception as e:
             logger.error(f"❌ Unfollow xatosi @{username}: {e}")
             return False

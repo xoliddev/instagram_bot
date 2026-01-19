@@ -3,14 +3,21 @@
 Startup script - Both bots run together
 Instagram Bot + Telegram Bot + Auto Backup
 """
-import threading
-import time
-import logging
 import os
+import time
+
+# Vaqt mintaqasini to'g'irlash (O'zbekiston vaqti)
+os.environ['TZ'] = 'Asia/Tashkent'
+if hasattr(time, 'tzset'):
+    time.tzset()
+
+import threading
+import logging
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
 
