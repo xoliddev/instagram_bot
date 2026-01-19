@@ -1354,7 +1354,7 @@ def main():
         print(f"\n{Fore.YELLOW}🤖 AVTOMATIK REJIM (24/7) - Server")
         
         # CRITICAL: Server startda har doim bazani yangilaymiz!
-        self.sync_my_followers()
+        bot.sync_my_followers()
         
         try:
             while True:
