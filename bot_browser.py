@@ -866,7 +866,26 @@ class InstagramBrowserBot:
                 
                 # Bitta storyni ko'rish vaqti (3-10 sekund)
                 watch_time = min(random.randint(3, 10), remaining)
-                logger.info(f"👀 Story ko'rilmoqda... ({watch_time}s)")
+                # Usernameni aniqlash
+                current_username = "Noma'lum"
+                try:
+                     # Header dagi username
+                     # Odatda header chap tomonda, rasm yonida bo'ladi
+                     user_el = self.page.locator('header a').first
+                     if user_el.is_visible():
+                         current_username = user_el.inner_text()
+                except:
+                    pass
+
+                logger.info(f"👀 Story ko'rilmoqda: @{current_username} ({watch_time}s)")
+                
+                # Agar yangi user bo'lsa - Telegramga yozish
+                if current_username != "Noma'lum":
+                    # Keshda bormi?
+                    if not hasattr(self, 'last_seen_story_user') or self.last_seen_story_user != current_username:
+                         self.send_telegram_msg(f"👀 <b>Story ko'rilmoqda:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
+                         self.last_seen_story_user = current_username
+
                 time.sleep(watch_time)
                 
                 # Random Like (20-30% ehtimol)
@@ -876,6 +895,7 @@ class InstagramBrowserBot:
                         if like_btn.is_visible():
                             like_btn.click()
                             logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
+                            self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
                             time.sleep(1)
                     except:
                         pass
@@ -900,6 +920,25 @@ class InstagramBrowserBot:
         if remaining > 0:
             logger.info(f"⏳ Qolgan vaqt: {int(remaining)}s kutilmoqda...")
             time.sleep(remaining)
+            
+    def send_telegram_msg(self, text: str):
+        """Telegramga xabar yuborish (Requests orqali - Conflict bo'lmaydi)"""
+        import requests
+        try:
+            # config.ADMIN_IDS birinchi adminiga
+            if config.ADMIN_IDS:
+                admin_id = config.ADMIN_IDS[0]
+                token = config.TELEGRAM_BOT_TOKEN
+                url = f"https://api.telegram.org/bot{token}/sendMessage"
+                payload = {
+                    "chat_id": admin_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True
+                }
+                requests.post(url, json=payload, timeout=5)
+        except:
+            pass
     
     def run_follow_cycle(self, count: int = 20, target: str = None):
         """Follow sikli"""
