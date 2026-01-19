@@ -928,14 +928,17 @@ class InstagramBrowserBot:
 
                 time.sleep(watch_time)
                 
-                # Random Like (50% ehtimol - ko'paytirildi)
+                # Random Like (50% ehtimol)
                 if random.random() < 0.5:
                     try:
-                        # Like tugmasini qidirish
-                        like_btn = self.page.locator('span svg[aria-label="Like"], span svg[aria-label="J\'aime"], span svg[aria-label="Нравится"]').first
+                        # Like tugmasini qidirish (Kengaytirilgan Regex)
+                        # EN: Like, RU: Нравится, UZ: Yoqtirish, TR: Beğen
+                        like_selector = re.compile(r"Like|Нравится|Yoqtirish|Beğen|J'aime", re.IGNORECASE)
+                        
+                        like_btn = self.page.locator('svg').filter(has_text=like_selector).first # Text bo'lmasligi mumkin
                         if not like_btn.is_visible():
-                             # Fallback: Parent buttons
-                             like_btn = self.page.locator('button svg[aria-label="Like"]').first
+                             # Attribute bo'yicha qidirish
+                             like_btn = self.page.locator('svg[aria-label]').filter(has_text=like_selector).first
                         
                         if like_btn.is_visible():
                             like_btn.click()
@@ -943,10 +946,19 @@ class InstagramBrowserBot:
                             self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
                             time.sleep(1)
                         else:
-                             # DEBUG: Nega topilmadi?
-                             pass
-                    except:
-                        pass
+                             # DEBUG: Tugma topilmadi - Sahifadagi barcha aria-label larni ko'rish
+                             try:
+                                 # Bir marta Telegramga tashlash (Debug uchun)
+                                 if not hasattr(self, 'debug_sent'):
+                                     all_labels = self.page.locator('[aria-label]').all_get_attributes('aria-label')
+                                     readable_labels = [l for l in all_labels if l and len(l) < 20] # Qisqa label lar
+                                     logger.warning(f"⚠️ Like topilmadi. Mavjud: {readable_labels}")
+                                     self.send_telegram_msg(f"⚠️ <b>DEBUG (Like topilmadi):</b>\nEkranda bor: {', '.join(readable_labels)}")
+                                     self.debug_sent = True
+                             except:
+                                 pass
+                    except Exception as e:
+                        logger.error(f"Like Error: {e}")
                 
                 # Keyingi storyga o'tish (Next tugmasi yoki Keyboard Right)
                 try:
