@@ -1151,11 +1151,21 @@ class InstagramBrowserBot:
         except Exception as e:
             logger.error(f"❌ Story ko'rishda xato: {e}")
             
-        # Agar vaqt ortib qolsa - shunchaki kutish
+        # Agar vaqt ortib qolsa - lekin buyruq o'zgarsa chiqib ketish kerak
         remaining = duration - (time.time() - start_time)
         if remaining > 0:
-            logger.info(f"⏳ Qolgan vaqt: {int(remaining)}s kutilmoqda...")
-            time.sleep(remaining)
+            logger.info(f"⏳ Qolgan vaqt: {int(remaining)}s. (Buyruqlar kutilmoqda...)")
+            
+            slept = 0
+            while slept < remaining:
+                time.sleep(1)
+                slept += 1
+                
+                # Buyruqni tekshirish
+                current_cycle_check = database.get_config("current_cycle", "auto")
+                if current_cycle_check != initial_cycle:
+                     logger.info(f"⚡ Kutish to'xtatildi (Yangi buyruq: {current_cycle_check})")
+                     break
             
     def send_telegram_msg(self, text: str):
         """Telegramga xabar yuborish (Requests orqali - Conflict bo'lmaydi)"""
