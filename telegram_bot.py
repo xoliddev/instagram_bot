@@ -340,8 +340,8 @@ async def cmd_unfollow(message: Message):
         await message.answer("⚠️ Bot allaqachon ishlayapti.")
         return
     
-    await message.answer("⏹️ Unfollow sikli boshlanmoqda...")
-    state.current_cycle = "unfollow"
+    await message.answer("🧹 Unfollow (Cleanup) sikli boshlanmoqda...\n\nSizga follow qaytarmaganlar tozalanadi.")
+    database.set_config("current_cycle", "cleanup")
 
 @router.message(Command("cleanup"))
 async def cmd_cleanup(message: Message):
