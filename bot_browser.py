@@ -93,6 +93,7 @@ class InstagramBrowserBot:
                     logger.error(f"❌ Cookie yuklash xatosi: {e}")
             
             self.page = self.context.new_page()
+            self.page.set_default_timeout(30000)
             logger.info("✅ Brauzer tayyor")
             return True
             
@@ -106,14 +107,17 @@ class InstagramBrowserBot:
         
         # Instagram'ga o'tish
         try:
-            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
+            logger.info("loading... (30s timeout)")
+            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=30000)
+            logger.info("✅ Sayt yuklandi (yoki timeout)")
         except Exception as e:
-            logger.warning(f"⚠️ Sekin internet: {e}")
+            logger.warning(f"⚠️ Navigatsiya xatosi: {e}")
             self.page.screenshot(path="error_nav.png")
             
-        time.sleep(5)
+        time.sleep(3)
         
         # Login holatini tekshirish
+        logger.info("🔍 Login holati tekshirilmoqda...")
         if self._is_logged_in():
             logger.info(f"✅ Allaqachon login qilingan!")
             return True
