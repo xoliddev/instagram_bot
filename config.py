@@ -60,3 +60,10 @@ import os
 # =============================================
 # Agar serverda bo'lsa (HEADLESS env vari bor bo'lsa), o'shani oladi. Yo'qsa False.
 HEADLESS = os.environ.get("HEADLESS", "False").lower() == "true"
+
+# Telegram Bot Token
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+# Admin ID lar (vergul bilan ajratilgan)
+admin_ids_str = os.environ.get("ADMIN_IDS", "")
+ADMIN_IDS = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
