@@ -944,24 +944,29 @@ class InstagramBrowserBot:
                         )
                         
                         # SVG ni topib, uning otasini (button) bosish kerak
-                        like_svg = self.page.locator(like_selector).first
+                        # Iterate through all matches to find the VISIBLE one
+                        like_svgs = self.page.locator(like_selector)
+                        count = like_svgs.count()
+                        clicked = False
                         
-                        if like_svg.is_visible():
-                            # Parent (Button) ni olish
-                            like_btn = like_svg.locator("..")
-                            like_btn.click(force=True)
-                            
-                            logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
-                            self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
-                            time.sleep(1)
-                        else:
+                        for i in range(count):
+                            svg = like_svgs.nth(i)
+                            if svg.is_visible():
+                                # Parent (Button) ni olish
+                                like_btn = svg.locator("..")
+                                like_btn.click(force=True)
+                                clicked = True
+                                logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
+                                self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
+                                time.sleep(1)
+                                break
+                        
+                        if not clicked:
                              # DEBUG: Tugma topilmadi
                              try:
                                  if not hasattr(self, 'debug_sent'):
                                      # SVG dagi barcha aria-label larni olib ko'ramiz (Filtrsiz)
-                                     # JS orqali barcha qimmatlarni olish (Tez va ishonchli)
                                      all_labels = self.page.locator('svg[aria-label]').evaluate_all("els => els.map(e => e.getAttribute('aria-label'))")
-                                     
                                      # Faqat qisqa va bo'sh bo'lmaganlarini olamiz
                                      readable_labels = [str(l) for l in all_labels if l and len(l) < 30] 
                                      
