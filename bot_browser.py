@@ -959,7 +959,9 @@ class InstagramBrowserBot:
                              try:
                                  if not hasattr(self, 'debug_sent'):
                                      # SVG dagi barcha aria-label larni olib ko'ramiz (Filtrsiz)
-                                     all_labels = self.page.locator('svg[aria-label]').all_get_attributes('aria-label')
+                                     # JS orqali barcha qimmatlarni olish (Tez va ishonchli)
+                                     all_labels = self.page.locator('svg[aria-label]').evaluate_all("els => els.map(e => e.getAttribute('aria-label'))")
+                                     
                                      # Faqat qisqa va bo'sh bo'lmaganlarini olamiz
                                      readable_labels = [str(l) for l in all_labels if l and len(l) < 30] 
                                      
