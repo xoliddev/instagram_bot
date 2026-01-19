@@ -23,11 +23,17 @@ logging.basicConfig(
 # Filter: Telegram Conflict xatolarini yashirish
 class TelegramConflictFilter(logging.Filter):
     def filter(self, record):
-        return "Conflict: terminated by other getUpdates request" not in record.getMessage()
+        msg = record.getMessage()
+        return "Conflict: terminated by other getUpdates request" not in msg and "Sleep for" not in msg
 
-# Filter ni root loggerga qo'shish
+# 1. Filter ni Loggerlarga qo'shish
 logging.getLogger().addFilter(TelegramConflictFilter())
 logging.getLogger("aiogram").addFilter(TelegramConflictFilter())
+logging.getLogger("aiogram.dispatcher").addFilter(TelegramConflictFilter())
+
+# 2. Filter ni Handlerlarga ham qo'shish (Eng muhimi!)
+for handler in logging.root.handlers:
+    handler.addFilter(TelegramConflictFilter())
 
 logger = logging.getLogger(__name__)
 

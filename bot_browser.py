@@ -882,30 +882,35 @@ class InstagramBrowserBot:
                 
                 # Bitta storyni ko'rish vaqti (3-10 sekund)
                 watch_time = min(random.randint(3, 10), remaining)
-                # Usernameni aniqlash
+                # Usernameni aniqlash (Retry bilan)
                 current_username = "Noma'lum"
-                try:
-                     # 1-usul (Eng ishonchli): URL dan olish
-                     # URL formati: https://www.instagram.com/stories/username/123456789/
-                     url = self.page.url
-                     match = re.search(r"stories/([^/]+)/", url)
-                     if match:
-                         current_username = match.group(1)
-                     
-                     # 2-usul: Header dagi link (Fallback)
-                     if current_username == "Noma'lum":
-                         user_el = self.page.locator('header a').first
-                         if user_el.is_visible():
-                             current_username = user_el.inner_text()
-                     
-                     # 3-usul: Header texti
-                     if current_username == "Noma'lum":
-                         header_text = self.page.locator('header').first.inner_text()
-                         lines = header_text.split('\n')
-                         if lines:
-                             current_username = lines[0]
-                except:
-                    pass
+                for _ in range(3): # 3 marta urinib ko'rish
+                    try:
+                         # 1-usul: URL
+                         url = self.page.url
+                         match = re.search(r"stories/([^/]+)/", url)
+                         if match:
+                             current_username = match.group(1)
+                             break # Topildi!
+                         
+                         # 2-usul: Header URL (Fallback)
+                         if current_username == "Noma'lum":
+                             user_el = self.page.locator('header a').first
+                             if user_el.is_visible():
+                                 current_username = user_el.inner_text()
+                                 if current_username != "Noma'lum": break
+                         
+                         # 3-usul: Text
+                         if current_username == "Noma'lum":
+                             header_text = self.page.locator('header').first.inner_text()
+                             lines = header_text.split('\n')
+                             if lines:
+                                 current_username = lines[0]
+                                 if current_username != "Noma'lum": break
+                    except:
+                        pass
+                    
+                    time.sleep(0.5) # URL yangilanishini kutish
 
                 logger.info(f"👀 Story ko'rilmoqda: @{current_username} ({watch_time}s)")
                 
