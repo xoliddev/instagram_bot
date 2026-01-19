@@ -1313,7 +1313,11 @@ class InstagramBrowserBot:
             followers_count = 0
             scroll_count = 0
             prev_count = 0
-            retry_attempts = 0 # Initialize retry counter
+            retry_attempts = 0
+            
+            collected_usernames = set()
+            IGNORE_LIST = {'explore', 'reels', 'stories', 'direct', 'accounts', config.INSTAGRAM_USERNAME, 'create', 'guide'}
+            
             MAX_SCROLLS = 100 # Katta limit (barchasini olish uchun)
             
             while scroll_count < MAX_SCROLLS:
@@ -1325,13 +1329,20 @@ class InstagramBrowserBot:
                         href = follower_links.nth(i).get_attribute("href")
                         if href and href.startswith("/"):
                             username = href.strip("/").split("/")[0]
-                            if username:
-                                # CRITICAL: Har birini bazaga yozamiz
-                                database.register_follower(username)
+                            
+                            # Filter
+                            if not username or len(username) < 2: continue
+                            if username in IGNORE_LIST: continue
+                            if username in collected_usernames: continue
+                            
+                            collected_usernames.add(username)
+                            
+                            # CRITICAL: Har birini bazaga yozamiz
+                            database.register_follower(username)
                     except:
                         pass
                 
-                followers_count = count
+                followers_count = len(collected_usernames)
                 
                 # Scroll (Javascript - Collect followers dagi kabi)
                 try:
@@ -1347,21 +1358,24 @@ class InstagramBrowserBot:
                             }
                         }
                     }""")
-                    time.sleep(2) # Stabilroq ishlash uchun 2s
+                    time.sleep(2) 
                 except:
                     pass
                 
                 scroll_count += 1
                 
-                # Agar o'zgarish bo'lmasa - Retry
+                # Agar o'zgarish bo'lmasa - Retry (Faqat unique count o'zgarmasa)
                 if followers_count == prev_count:
                     retry_attempts += 1
                     logger.info(f"⏳ Yuklanmoqda... ({retry_attempts}/3)")
-                    time.sleep(4) # Katta pauza
+                    time.sleep(4) 
                     
                     # Yana bir scroll qilib ko'rish
                     try:
-                        self.page.evaluate("arguments[0].scrollTop += 1000", dialog.element_handle())
+                        self.page.evaluate("""() => {
+                             const dialog = document.querySelector('div[role="dialog"]');
+                             if (dialog) dialog.scrollTop += 500;
+                        }""")
                     except: 
                         pass
                         
@@ -1369,7 +1383,7 @@ class InstagramBrowserBot:
                         logging.info("✅ Ro'yxat oxiriga yetildi (yoki yuklanmayapti).")
                         break
                 else:
-                    retry_attempts = 0 # O'zgarish bo'lsa - retry ni reset qilamiz
+                    retry_attempts = 0 
                 
                 prev_count = followers_count
                 
