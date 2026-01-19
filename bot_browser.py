@@ -607,6 +607,21 @@ class InstagramBrowserBot:
             logger.error(f"❌ Followers olishda xato: {e}")
             return set()
     
+    def smart_sleep(self, seconds: int) -> bool:
+        """Kutish davomida buyruqlarni tekshirish. Agar buyruq o'zgarsa True qaytaradi."""
+        slept = 0
+        while slept < seconds:
+            time.sleep(1)
+            slept += 1
+            if slept % 2 == 0: # Har 2 sekundda tekshirish
+                 current = database.get_config("current_cycle")
+                 # Agar biz 'cleanup' da bo'lsak va 'stories' yoki 'auto' kelsa... 
+                 # Unfollow paytida faqat 'auto' yoki 'cleanup' ruxsat etiladi. 'stories' kelishi bilan to'xtash kerak.
+                 if current not in ['cleanup', 'auto']: 
+                     logger.info(f"⚡ Kutish to'xtatildi! Yangi buyruq: {current}")
+                     return True
+        return False
+
     def check_and_unfollow(self):
         """24 soat o'tganlarni tekshirish va unfollow qilish"""
         logger.info("🔍 24 soat tekshiruvi boshlanmoqda...")
@@ -635,11 +650,19 @@ class InstagramBrowserBot:
                     logger.info(f"{Fore.YELLOW}❌ @{username} follow qaytarmagan ({hours:.1f} soat)")
         
         # Unfollow
+        # Unfollow
         for username in to_unfollow:
+            # 0. Buyruqni tekshirish
+            if database.get_config("current_cycle") not in ['cleanup', 'auto']:
+                 logger.info("⚡ Unfollow to'xtatildi (Yangi buyruq)")
+                 break
+
             if self.unfollow_user(username):
                 delay = self.get_human_delay(config.UNFOLLOW_DELAY_MIN, config.UNFOLLOW_DELAY_MAX)
                 logger.info(f"⏳ {delay} sekund kutilmoqda...")
-                time.sleep(delay)
+                # Smart sleep: Agar True qaytarsa (buyruq o'zgarsa), siklni buzamiz
+                if self.smart_sleep(delay):
+                    break
     
     def get_my_following(self) -> set:
         """Biz follow qilgan odamlarni olish (Following list)"""
@@ -779,6 +802,18 @@ class InstagramBrowserBot:
             try:
                 self.page.goto(f"https://www.instagram.com/{username}/", timeout=30000)
                 time.sleep(3)
+                
+                # 1.5 TEZKOR TEKSHIRUV: Balki allaqachon unfollow qilingandir?
+                # Agar "Follow" tugmasi bo'lsa, API chaqirib o'tirmaymiz.
+                head_check = self.page.locator('header section').first
+                if not head_check.is_visible(): head_check = self.page.locator('main header').first
+                
+                check_btn = head_check.locator('button').filter(has_text=re.compile(r"Follow|Obuna bo'lish|Подписаться|Takip et", re.IGNORECASE)).first
+                if check_btn.is_visible():
+                    logger.info(f"ℹ️ @{username} allaqachon unfollow qilingan (Follow tugmasi bor)")
+                    database.update_status(username, 'unfollowed')
+                    return False
+
             except Exception as e:
                 logger.warning(f"⚠️ Profil yuklashda timeout (lekin davom etamiz): {e}")
 
@@ -1429,3 +1464,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
