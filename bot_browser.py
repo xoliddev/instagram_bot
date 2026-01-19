@@ -932,20 +932,28 @@ class InstagramBrowserBot:
                 # Random Like (100% ehtimol - Test uchun)
                 if random.random() < 1.0:
                     try:
-                        # Like tugmasini qidirish (CSS Selector - ishonchli)
-                        # EN: Like, RU: Нравится, UZ: Yoqtirish, TR: Beğen, FR: J'aime
+                        # Like tugmasini qidirish
+                        # 1. Aniq match (Unlike so'zini adashtirmaslik uchun)
                         like_selector = (
-                            'svg[aria-label*="Like"], '
-                            'svg[aria-label*="Нравится"], '
-                            'svg[aria-label*="Yoqtirish"], '
-                            'svg[aria-label*="Beğen"], '
-                            'svg[aria-label*="J\'aime"]'
+                            'svg[aria-label="Like"], '
+                            'svg[aria-label="Нравится"], '
+                            'svg[aria-label="Yoqtirish"], '
+                            'svg[aria-label="Beğen"], '
+                            'svg[aria-label="J\'aime"]'
                         )
                         
-                        like_btn = self.page.locator(like_selector).first
+                        # SVG ni topib, uning otasini (button) bosish kerak
+                        like_svg = self.page.locator(like_selector).first
                         
-                        if like_btn.is_visible():
-                            like_btn.click()
+                        if like_svg.is_visible():
+                            # Ehtiyotkorlik: Agar "Unlike" bo'lsa tegmash kerak
+                            # Lekin biz aniq "Like" deb qidirdik (katta kichik harfga qarab farq qiladi)
+                            
+                            # Parent (Button) ni olish
+                            like_btn = like_svg.locator("..")
+                            
+                            like_btn.click(force=True) # Force click
+                            
                             logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
                             self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
                             time.sleep(1)
@@ -953,11 +961,13 @@ class InstagramBrowserBot:
                              # DEBUG: Tugma topilmadi
                              try:
                                  if not hasattr(self, 'debug_sent'):
+                                     # SVG dagi barcha aria-label larni olib ko'ramiz
                                      all_labels = self.page.locator('svg[aria-label]').all_get_attributes('aria-label')
-                                     readable_labels = [l for l in all_labels if l and len(l) < 30]
-                                     logger.warning(f"⚠️ Like topilmadi. Mavjud: {readable_labels}")
-                                     self.send_telegram_msg(f"⚠️ <b>DEBUG (Like topilmadi):</b>\nEkranda: {', '.join(readable_labels)}")
-                                     self.debug_sent = True
+                                     readable_labels = [l for l in all_labels if l and "Like" in l or "like" in l] 
+                                     if readable_labels:
+                                         logger.warning(f"⚠️ Like topilmadi. O'xshashlar: {readable_labels}")
+                                         self.send_telegram_msg(f"⚠️ <b>DEBUG (Like muammo):</b>\nBot topa olmadi. Ekranda o'xshash bor: {', '.join(readable_labels)}")
+                                         self.debug_sent = True
                              except:
                                  pass
                     except Exception as e:
