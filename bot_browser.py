@@ -505,17 +505,28 @@ class InstagramBrowserBot:
             return False
         
         try:
-            # Profilga o'tish
+            # Profilga o'tish (Timeout bilan)
             logger.info(f"🔍 Profilga kirilmoqda: @{username}")
-            self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=60000)
+            try:
+                self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=30000)
+            except Exception as goto_err:
+                logger.warning(f"⚠️ Profil yuklashda timeout: @{username}")
+                database.add_user(username) # Bazaga qo'shib, skip qilaylik
+                return False
             time.sleep(2)
             
-            # Follow tugmasini topish
-            follow_btn = self.page.locator('button:has-text("Follow")').first
-            
-            if not follow_btn.is_visible():
+            # Follow tugmasini topish (Timeout bilan)
+            try:
+                follow_btn = self.page.locator('button:has-text("Follow")').first
+                follow_btn.wait_for(timeout=5000) # 5 sekund kutish
+                
+                if not follow_btn.is_visible():
+                    logger.info(f"⏭️ @{username} allaqachon follow qilingan yoki mavjud emas")
+                    database.add_user(username)
+                    return False
+            except:
                 logger.info(f"⏭️ @{username} allaqachon follow qilingan yoki mavjud emas")
-                database.add_user(username) # Bazaga qo'shib qo'yamiz
+                database.add_user(username)
                 return False
             
             # Follow bosish
