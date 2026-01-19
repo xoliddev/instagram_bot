@@ -1056,40 +1056,52 @@ class InstagramBrowserBot:
                      self.send_telegram_msg(msg_text)
                      self.last_seen_story_user = current_username
 
+                # 0. Buyruqni tekshirish (Loop ichida)
+                current_cycle_check = database.get_config("current_cycle", "auto")
+                if current_cycle_check == 'cleanup':
+                     logger.info("⚡ Story ko'rish to'xtatildi (Cleanup buyrug'i)")
+                     break
+
                 time.sleep(watch_time)
                 
-                # Random Like (50% ehtimol)
                 # Random Like (100% ehtimol - Test uchun)
                 if random.random() < 1.0:
                     try:
-                        # Like tugmasini qidirish
-                        # 1. Partial Match (Kengroq qamrov)
-                        like_selector = (
-                            'svg[aria-label*="Like"], '
-                            'svg[aria-label*="like"], '
-                            'svg[aria-label*="Нравится"], '
-                            'svg[aria-label*="Yoqtirish"], '
-                            'svg[aria-label*="Beğen"], '
-                            'svg[aria-label*="J\'aime"]'
+                        # 1. AVVAL TEKSHIRAMIZ: Allaqaqchon like bosilganmi?
+                        unlike_selector = (
+                            'svg[aria-label*="Unlike"], '
+                            'svg[aria-label*="O\'chirish"], '
+                            'svg[aria-label*="Yoqtirishni bekor qilish"], '
+                            'svg[aria-label*="Vazgeç"], '
+                            'svg[aria-label*="Je n\'aime plus"]'
                         )
-                        
-                        # SVG ni topib, uning otasini (button) bosish kerak
-                        # Iterate through all matches to find the VISIBLE one
-                        like_svgs = self.page.locator(like_selector)
-                        count = like_svgs.count()
-                        clicked = False
-                        
-                        for i in range(count):
-                            svg = like_svgs.nth(i)
-                            if svg.is_visible():
-                                # Parent (Button) ni olish
-                                like_btn = svg.locator("..")
-                                like_btn.click(force=True)
-                                clicked = True
-                                logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
-                                self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
-                                time.sleep(1)
-                                break
+                        if self.page.locator(unlike_selector).first.is_visible():
+                            logger.info(f"ℹ️ {current_username}: Storyga allaqachon like bosilgan.")
+                        else:
+                            # Like bosish
+                            like_selector = (
+                                'svg[aria-label*="Like"], '
+                                'svg[aria-label*="like"], '
+                                'svg[aria-label*="Нравится"], '
+                                'svg[aria-label*="Yoqtirish"], '
+                                'svg[aria-label*="Beğen"], '
+                                'svg[aria-label*="J\'aime"]'
+                            )
+                            
+                            like_svgs = self.page.locator(like_selector)
+                            count = like_svgs.count()
+                            clicked = False
+                            
+                            for i in range(count):
+                                svg = like_svgs.nth(i)
+                                if svg.is_visible():
+                                    like_btn = svg.locator("..")
+                                    like_btn.click(force=True)
+                                    clicked = True
+                                    logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
+                                    self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
+                                    time.sleep(1)
+                                    break
                         
                         if not clicked:
                              # DEBUG: Tugma topilmadi
