@@ -810,6 +810,79 @@ class InstagramBrowserBot:
             logger.error(f"❌ Unfollow xatosi @{username}: {e}")
             return False
     
+    def watch_stories_and_like(self, duration: int):
+        """
+        Storylarni tomosha qilish va like bosish (Human-Like Behavior)
+        Sleep o'rniga ishlatiladi.
+        """
+        import re
+        logger.info(f"🍿 Story tomosha qilish rejimi: {duration} sekund...")
+        
+        start_time = time.time()
+        
+        try:
+            # 1. Bosh sahifaga o'tish
+            if self.page.url != "https://www.instagram.com/":
+                self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
+                time.sleep(3)
+            
+            # 2. Story tray topish va birinchi storyni ochish
+            # "Story" aria-label yoki shunga o'xshash
+            stories = self.page.locator('div[role="button"]').filter(has_text=re.compile(r"Story|Hikoya|История", re.IGNORECASE))
+            
+            if stories.count() > 0:
+                stories.first.click()
+                time.sleep(2)
+            else:
+                # Agar button topilmasa, canvas yoki shunchaki coordinata bilan urinib ko'rish (hozircha log)
+                logger.warning("⚠️ Storylar topilmadi, shunchaki kutilmoqda...")
+                time.sleep(duration)
+                return
+
+            # 3. Loop: Story ko'rish va like bosish
+            while (time.time() - start_time) < duration:
+                # Qancha vaqt qoldi?
+                remaining = duration - (time.time() - start_time)
+                if remaining <= 0:
+                    break
+                
+                # Bitta storyni ko'rish vaqti (3-10 sekund)
+                watch_time = min(random.randint(3, 10), remaining)
+                logger.info(f"👀 Story ko'rilmoqda... ({watch_time}s)")
+                time.sleep(watch_time)
+                
+                # Random Like (20-30% ehtimol)
+                if random.random() < 0.3:
+                    try:
+                        like_btn = self.page.locator('svg[aria-label="Like"], svg[aria-label="J\'aime"], svg[aria-label="Нравится"]').locator("..").first
+                        if like_btn.is_visible():
+                            like_btn.click()
+                            logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
+                            time.sleep(1)
+                    except:
+                        pass
+                
+                # Keyingi storyga o'tish (Next tugmasi yoki Keyboard Right)
+                try:
+                    self.page.keyboard.press("ArrowRight")
+                    time.sleep(0.5)
+                except:
+                    break
+                    
+                # Agar storylar tugagan bo'lsa (Home sahifasiga qaytgan bo'lsa)
+                if self.page.url == "https://www.instagram.com/":
+                    logger.info("✅ Barcha storylar ko'rildi.")
+                    break
+
+        except Exception as e:
+            logger.error(f"❌ Story ko'rishda xato: {e}")
+            
+        # Agar vaqt ortib qolsa - shunchaki kutish
+        remaining = duration - (time.time() - start_time)
+        if remaining > 0:
+            logger.info(f"⏳ Qolgan vaqt: {int(remaining)}s kutilmoqda...")
+            time.sleep(remaining)
+    
     def run_follow_cycle(self, count: int = 20, target: str = None):
         """Follow sikli"""
         # Multi-target: random target tanlash
@@ -991,10 +1064,12 @@ def main():
                                                        (datetime.now(), user))
                                             conn.commit()
                                         
-                                        # Human Delay (2-5 daqiqa)
+                                        # Human Delay (Story Tomosha qilish)
                                         delay = bot.get_human_delay(config.FOLLOW_DELAY_MIN, config.FOLLOW_DELAY_MAX)
                                         logger.info(f"⏳ Keyingi followgacha: {delay} sekund...")
-                                        time.sleep(delay)
+                                        
+                                        # Sleep o'rniga Story ko'rish
+                                        bot.watch_stories_and_like(delay)
 
                                     except Exception as e:
                                         logger.error(f"❌ DB Update error: {e}")
