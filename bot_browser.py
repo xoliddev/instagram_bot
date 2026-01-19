@@ -966,7 +966,9 @@ class InstagramBrowserBot:
         Sleep o'rniga ishlatiladi.
         """
         import re
-        logger.info(f"🍿 Story tomosha qilish rejimi: {duration} sekund...")
+        # Boshlang'ich siklni eslab qolamiz (agar o'zgarsa, loopni buzish uchun)
+        initial_cycle = database.get_config("current_cycle", "auto")
+        logger.info(f"🍿 Story tomosha qilish rejimi: {duration} sekund... (Mode: {initial_cycle})")
         
         start_time = time.time()
         
@@ -1058,8 +1060,8 @@ class InstagramBrowserBot:
 
                 # 0. Buyruqni tekshirish (Loop ichida)
                 current_cycle_check = database.get_config("current_cycle", "auto")
-                if current_cycle_check == 'cleanup':
-                     logger.info("⚡ Story ko'rish to'xtatildi (Cleanup buyrug'i)")
+                if current_cycle_check != initial_cycle:
+                     logger.info(f"⚡ Story ko'rish to'xtatildi (Yangi buyruq: {current_cycle_check})")
                      break
 
                 time.sleep(watch_time)
@@ -1398,19 +1400,10 @@ def main():
                         continue
 
                     wait_time = random.randint(3600, 7200) 
-                    logger.info(f"⏳ Sikl tugadi. {wait_time/60:.1f} daqiqa kutilmoqda...")
+                    logger.info(f"⏳ Sikl tugadi. {wait_time/60:.1f} daqiqa davomida Story ko'riladi (Smart Sleep)...")
                     
-                    # Kutish davomida buyruqlarni tekshirish (har 5 sekund)
-                    slept = 0
-                    while slept < wait_time:
-                        time.sleep(5)
-                        slept += 5
-                        
-                        # Agar buyruq kelsa - kutishni buzamiz
-                        new_cycle = database.get_config("current_cycle", "auto")
-                        if new_cycle in ['collect', 'cleanup']:
-                            logger.info(f"⚡ Yangi buyruq ({new_cycle})! Kutish to'xtatildi.")
-                            break
+                    # Sleep o'rniga Story ko'rish (ichida buyruqni tekshiradi)
+                    bot.watch_stories_and_like(wait_time)
                             
                 except Exception as e:
                     logger.error(f"❌ Main loop xatosi: {e}")
