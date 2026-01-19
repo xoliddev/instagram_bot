@@ -787,8 +787,17 @@ class InstagramBrowserBot:
                      logger.info(f"⏭️ @{username} o'tkazib yuborildi (Status: followed_back)")
                      continue
                 
-                # 2. Cleanup rejimida 24 soatlik limit bekor qilinadi!
-                # Faqat "followed_back" bo'lmasa bo'ldi.
+                # 2. 24 soatlik himoya (GENTLE CLEANUP)
+                if user_data.get('followed_at'):
+                    try:
+                        followed_at = datetime.fromisoformat(user_data['followed_at'])
+                        hours_diff = (datetime.now() - followed_at).total_seconds() / 3600
+                        if hours_diff < 24:
+                            logger.info(f"⏭️ @{username} o'tkazib yuborildi (Hali 24 soat bo'lmadi: {hours_diff:.1f}s)")
+                            time.sleep(0.1)
+                            continue
+                    except:
+                        pass
 
             try:
                 if self.unfollow_user(username):
@@ -1012,7 +1021,12 @@ class InstagramBrowserBot:
         try:
             # 1. Bosh sahifaga o'tish
             if self.page.url != "https://www.instagram.com/":
-                self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
+                try:
+                    self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
+                except Exception as goto_err:
+                     logger.warning(f"⚠️ Main page fetch warning: {goto_err}")
+                     # Agar url ochilgan bo'lsa davom etaveramiz
+                     if "instagram.com" not in self.page.url: raise goto_err
                 time.sleep(3)
             
             # 2. Story tray topish va birinchi storyni ochish
