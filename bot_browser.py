@@ -831,17 +831,31 @@ class InstagramBrowserBot:
                 time.sleep(3)
             
             # 2. Story tray topish va birinchi storyni ochish
-            # "Story" aria-label yoki shunga o'xshash
-            stories = self.page.locator('div[role="button"]').filter(has_text=re.compile(r"Story|Hikoya|История", re.IGNORECASE))
+            # Eng ishonchli usul: <canvas> elementlari (Storyning rangli aylanasi)
+            # Ular tilga bog'liq emas.
+            story_rings = self.page.locator('canvas')
+            ring_count = story_rings.count()
             
-            if stories.count() > 0:
-                stories.first.click()
-                time.sleep(2)
+            if ring_count > 0:
+                logger.info(f"✅ {ring_count} ta story (canvas) topildi.")
+                # Odatda 1-chi canvas = O'zimizning story (Add Story)
+                # 2-chi canvas = Birinchi do'stimizning storysi
+                if ring_count > 1:
+                    story_rings.nth(1).click()
+                else:
+                    story_rings.first.click()
+                
+                time.sleep(3) # Ochilishini kutish
             else:
-                # Agar button topilmasa, canvas yoki shunchaki coordinata bilan urinib ko'rish (hozircha log)
-                logger.warning("⚠️ Storylar topilmadi, shunchaki kutilmoqda...")
-                time.sleep(duration)
-                return
+                # Fallback: Text orqali qidirish (eski usul)
+                stories = self.page.locator('div[role="button"]').filter(has_text=re.compile(r"Story|Hikoya|История", re.IGNORECASE))
+                if stories.count() > 0:
+                    stories.first.click()
+                    time.sleep(2)
+                else:
+                    logger.warning("⚠️ Storylar topilmadi (Canvas yoki Text yo'q). Shunchaki kutilmoqda...")
+                    time.sleep(duration)
+                    return
 
             # 3. Loop: Story ko'rish va like bosish
             while (time.time() - start_time) < duration:
