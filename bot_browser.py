@@ -785,37 +785,27 @@ class InstagramBrowserBot:
             logger.info(f"🔍 User ID qidirilmoqda: @{username}")
             # 2. User ID ni olish (JavaScript orqali)
             user_id = None
+            # 2. User ID ni olish (JavaScript orqali)
+            user_id = None
             try:
-                # Methog 1: shared_data orqali
-                user_id = self.page.evaluate("""() => {
-                    try {
-                        // window._sharedData dan
-                        if (window._sharedData && window._sharedData.entry_data && 
-                            window._sharedData.entry_data.ProfilePage) {
-                            return window._sharedData.entry_data.ProfilePage[0].graphql.user.id;
-                        }
-                        // Redux store dan
-                        const profileLink = document.querySelector('header section a[role="link"]');
-                        if (profileLink && profileLink.href) {
-                            const match = document.body.innerHTML.match(/"id":"(\\d+)"/);
-                            if (match) return match[1];
-                        }
-                        return null;
-                    } catch(e) { return null; }
-                }""")
+                # Method 1: API orqali (Eng ishonchli)
+                profile_json_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
+                user_id = self.page.evaluate(f"""async () => {{
+                    try {{
+                        const resp = await fetch("{profile_json_url}", {{
+                            headers: {{ 
+                                "X-IG-App-ID": "936619743392459",
+                                "X-Requested-With": "XMLHttpRequest"
+                            }}
+                        }});
+                        const data = await resp.json();
+                        return data.data.user.id;
+                    }} catch(e) {{ return null; }}
+                }}""")
                 
+                # Method 2: Meta taglardan (Fallback)
                 if not user_id:
-                    # Method 2: Qo'shimcha JSON endpoint
-                    profile_json_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
-                    user_id = self.page.evaluate(f"""async () => {{
-                        try {{
-                            const resp = await fetch("{profile_json_url}", {{
-                                headers: {{ "X-IG-App-ID": "936619743392459" }}
-                            }});
-                            const data = await resp.json();
-                            return data.data.user.id;
-                        }} catch(e) {{ return null; }}
-                    }}""")
+                     user_id = self.page.locator('meta[property="instapp:owner_user_id"]').get_attribute('content')
             except Exception as e:
                 logger.warning(f"⚠️ User ID olishda xato: {e}")
             
