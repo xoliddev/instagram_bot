@@ -818,7 +818,8 @@ class InstagramBrowserBot:
             if user_id:
                 logger.info(f"🔧 API Unfollow: @{username} (ID: {user_id})")
                 
-                success = self.page.evaluate(f"""async () => {{
+                # API chaqirish va natijani olish
+                api_result = self.page.evaluate(f"""async () => {{
                     try {{
                         const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
                         const response = await fetch("https://www.instagram.com/api/v1/friendships/destroy/{user_id}/", {{
@@ -831,17 +832,31 @@ class InstagramBrowserBot:
                             }},
                             credentials: "include"
                         }});
-                        return response.ok;
-                    }} catch(e) {{ return false; }}
+                        const data = await response.json();
+                        return {{ ok: response.ok, status: data.status, following: data.following }};
+                    }} catch(e) {{ return {{ ok: false, error: e.toString() }}; }}
                 }}""")
                 
-                if success:
-                    database.update_status(username, 'unfollowed')
-                    _, daily_unfollow = database.get_today_stats()
-                    logger.info(f"{Fore.RED}🚫 Unfollow: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
-                    return True
+                logger.info(f"📨 API Response: {api_result}")
+                
+                # Natijani tekshirish
+                if api_result and api_result.get('status') == 'ok' and api_result.get('following') == False:
+                    # Tasdiqlash: Sahifani yangilab, "Follow" tugmasi borligini tekshirish
+                    self.page.reload()
+                    time.sleep(2)
+                    
+                    header_section = self.page.locator('header section').first
+                    follow_btn = header_section.locator('button').filter(has_text=re.compile(r"Follow|Obuna bo'lish|Подписаться", re.IGNORECASE)).first
+                    
+                    if follow_btn.is_visible():
+                        database.update_status(username, 'unfollowed')
+                        _, daily_unfollow = database.get_today_stats()
+                        logger.info(f"{Fore.RED}🚫 Unfollow TASDIQLANDI: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
+                        return True
+                    else:
+                        logger.warning(f"⚠️ API muvaffaqiyatli dedi, lekin Follow tugmasi yo'q @{username}. UI ga o'tilmoqda...")
                 else:
-                    logger.warning(f"⚠️ API Unfollow muvaffaqiyatsiz @{username}. UI ga o'tilmoqda...")
+                    logger.warning(f"⚠️ API Unfollow muvaffaqiyatsiz @{username}: {api_result}. UI ga o'tilmoqda...")
             
             # 4. FALLBACK: UI orqali Unfollow (Eski usul)
             # Header section topish
