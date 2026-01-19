@@ -1481,6 +1481,10 @@ def main():
         # CRITICAL: Server startda har doim bazani yangilaymiz!
         bot.sync_my_followers()
         
+        # IMPORTANT: Startup rejimda "auto" holatiga qaytaramiz
+        database.set_config("current_cycle", "auto")
+        database.set_config("strict_mode", "false")
+        
         try:
             while True:
                 try:
