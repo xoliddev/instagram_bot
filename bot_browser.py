@@ -774,10 +774,15 @@ class InstagramBrowserBot:
             return False
         
         try:
-            # 1. Profilga o'tish
-            self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(2)
-            
+            logger.info(f"⏳ Profilga o'tilmoqda: @{username}")
+            # 1. Profilga o'tish (Timeout 30s ga kamaytirildi)
+            try:
+                self.page.goto(f"https://www.instagram.com/{username}/", timeout=30000)
+                time.sleep(3)
+            except Exception as e:
+                logger.warning(f"⚠️ Profil yuklashda timeout (lekin davom etamiz): {e}")
+
+            logger.info(f"🔍 User ID qidirilmoqda: @{username}")
             # 2. User ID ni olish (JavaScript orqali)
             user_id = None
             try:
