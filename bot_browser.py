@@ -1119,7 +1119,14 @@ class InstagramBrowserBot:
                                         like_btn.click(force=True)
                                         clicked = True
                                         logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
-                                        self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
+                                        
+                                        # Link yasash (Xatolikni oldini olish uchun)
+                                        if "Noma'lum" in current_username:
+                                            user_display = f"<i>{current_username}</i>"
+                                        else:
+                                            user_display = f"<a href='https://instagram.com/{current_username}'>@{current_username}</a>"
+                                            
+                                        self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> {user_display}")
                                         time.sleep(1)
                                         break
                                     except Exception as click_err:
