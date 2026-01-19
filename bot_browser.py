@@ -548,6 +548,8 @@ class InstagramBrowserBot:
                 return False
             
         except Exception as e:
+            if "Target page, context or browser has been closed" in str(e):
+                raise e
             logger.error(f"❌ Follow xatosi @{username}: {e}")
             return False
     
@@ -807,6 +809,8 @@ class InstagramBrowserBot:
                 return False
                 
         except Exception as e:
+            if "Target page, context or browser has been closed" in str(e):
+                raise e
             logger.error(f"❌ Unfollow xatosi @{username}: {e}")
             return False
     
@@ -1106,6 +1110,9 @@ def main():
                             
                 except Exception as e:
                     logger.error(f"❌ Main loop xatosi: {e}")
+                    if "Target page, context or browser has been closed" in str(e):
+                         logger.critical("🔥 Browser yopilib qoldi! Qayta ishga tushirish uchun thread to'xtatilmoqda...")
+                         break # Threadni tugatish (start.py qayta yoqadi)
                     time.sleep(60)
                 
         except KeyboardInterrupt:
