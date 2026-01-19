@@ -1016,6 +1016,7 @@ def main():
         print(f"\n{Fore.YELLOW}🤖 AVTOMATIK REJIM (24/7) - Server")
         
         try:
+            while True:
                 try:
                     # 1. State tekshirish (Bazadan)
                     current_cycle = database.get_config("current_cycle", "auto")
