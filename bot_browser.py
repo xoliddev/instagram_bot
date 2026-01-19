@@ -976,9 +976,13 @@ class InstagramBrowserBot:
                     "parse_mode": "HTML",
                     "disable_web_page_preview": True
                 }
-                requests.post(url, json=payload, timeout=5)
-        except:
-            pass
+                resp = requests.post(url, json=payload, timeout=5)
+                if resp.status_code != 200:
+                    logger.error(f"❌ Telegram Error {resp.status_code}: {resp.text}")
+            else:
+                logger.warning("⚠️ ADMIN_IDS topilmadi, xabar yuborilmadi.")
+        except Exception as e:
+            logger.error(f"❌ Telegram Connection Error: {e}")
     
     def run_follow_cycle(self, count: int = 20, target: str = None):
         """Follow sikli"""
