@@ -764,8 +764,9 @@ class InstagramBrowserBot:
         return result
     
     def unfollow_user(self, username: str) -> bool:
-        """Foydalanuvchini unfollow qilish (Universal Selectorlar)"""
+        """Foydalanuvchini unfollow qilish (API + UI Fallback)"""
         import re
+        import json
         
         _, daily_unfollow = database.get_today_stats()
         if daily_unfollow >= config.DAILY_UNFOLLOW_LIMIT:
@@ -773,77 +774,126 @@ class InstagramBrowserBot:
             return False
         
         try:
-            # Profilga o'tish
+            # 1. Profilga o'tish
             self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(3)
+            time.sleep(2)
             
-            # Universal "Following" tugmasini topish (Header ichidan)
-            # 1. Matn orqali (EN, RU, UZ...) + Header context
+            # 2. User ID ni olish (JavaScript orqali)
+            user_id = None
+            try:
+                # Methog 1: shared_data orqali
+                user_id = self.page.evaluate("""() => {
+                    try {
+                        // window._sharedData dan
+                        if (window._sharedData && window._sharedData.entry_data && 
+                            window._sharedData.entry_data.ProfilePage) {
+                            return window._sharedData.entry_data.ProfilePage[0].graphql.user.id;
+                        }
+                        // Redux store dan
+                        const profileLink = document.querySelector('header section a[role="link"]');
+                        if (profileLink && profileLink.href) {
+                            const match = document.body.innerHTML.match(/"id":"(\\d+)"/);
+                            if (match) return match[1];
+                        }
+                        return null;
+                    } catch(e) { return null; }
+                }""")
+                
+                if not user_id:
+                    # Method 2: Qo'shimcha JSON endpoint
+                    profile_json_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
+                    user_id = self.page.evaluate(f"""async () => {{
+                        try {{
+                            const resp = await fetch("{profile_json_url}", {{
+                                headers: {{ "X-IG-App-ID": "936619743392459" }}
+                            }});
+                            const data = await resp.json();
+                            return data.data.user.id;
+                        }} catch(e) {{ return null; }}
+                    }}""")
+            except Exception as e:
+                logger.warning(f"⚠️ User ID olishda xato: {e}")
+            
+            # 3. API orqali Unfollow (Tugma bosishsiz!)
+            if user_id:
+                logger.info(f"🔧 API Unfollow: @{username} (ID: {user_id})")
+                
+                success = self.page.evaluate(f"""async () => {{
+                    try {{
+                        const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+                        const response = await fetch("https://www.instagram.com/api/v1/friendships/destroy/{user_id}/", {{
+                            method: "POST",
+                            headers: {{
+                                "Content-Type": "application/x-www-form-urlencoded",
+                                "X-CSRFToken": csrfToken,
+                                "X-IG-App-ID": "936619743392459",
+                                "X-Requested-With": "XMLHttpRequest"
+                            }},
+                            credentials: "include"
+                        }});
+                        return response.ok;
+                    }} catch(e) {{ return false; }}
+                }}""")
+                
+                if success:
+                    database.update_status(username, 'unfollowed')
+                    _, daily_unfollow = database.get_today_stats()
+                    logger.info(f"{Fore.RED}🚫 Unfollow: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
+                    return True
+                else:
+                    logger.warning(f"⚠️ API Unfollow muvaffaqiyatsiz @{username}. UI ga o'tilmoqda...")
+            
+            # 4. FALLBACK: UI orqali Unfollow (Eski usul)
+            # Header section topish
             header_section = self.page.locator('header section').first
             if not header_section.is_visible():
                 header_section = self.page.locator('main header').first
             
-            # Buttonni header ichidan qidiramiz
-            following_btn = header_section.locator('button').filter(has_text=re.compile(r"Following|Requested|Подписки|Запрос|Obuna bo‘lingan|So‘rov yuborilgan|Takip", re.IGNORECASE)).first
+            # Following tugmasi
+            following_btn = header_section.locator('button').filter(has_text=re.compile(r"Following|Requested|Подписки|Запрос|Obuna bo'lingan|So'rov yuborilgan|Takip", re.IGNORECASE)).first
             
             if not following_btn.is_visible():
-                # Balki allaqachon unfollow qilingandir? "Follow" tugmasi bormi?
-                follow_btn = header_section.locator('button').filter(has_text=re.compile(r"Follow|Obuna bo‘lish|Подписаться|Takip et", re.IGNORECASE)).first
+                # Follow tugmasi bormi?
+                follow_btn = header_section.locator('button').filter(has_text=re.compile(r"Follow|Obuna bo'lish|Подписаться|Takip et", re.IGNORECASE)).first
                 
                 if follow_btn.is_visible():
-                    logger.info(f"info: ⏭️ @{username} allaqachon unfollow qilingan (Follow tugmasi bor)")
+                    logger.info(f"⏭️ @{username} allaqachon unfollow qilingan")
                     database.update_status(username, 'unfollowed')
                     return False
                 else:
-                    # DEBUG: Umuman tugma topilmadi?
                     all_text = header_section.inner_text()
-                    logger.warning(f"⚠️ Headerda tugma topilmadi @{username}. Header text: {all_text.replace('\n', ' ')}")
+                    clean_text = all_text.replace('\n', ' ')
+                    logger.warning(f"⚠️ Headerda tugma topilmadi @{username}. Header: {clean_text[:100]}")
                     return False
             
             # Tugmani bosish
             following_btn.click(force=True)
             time.sleep(2)
             
-            # "Unfollow" modal tugmasini bosish
+            # Modal
             dialog = self.page.locator('div[role="dialog"]')
-            
-            # Agar dialog chiqmasa, yana bir marta bosib ko'rish
             if not dialog.is_visible():
                  following_btn.click(force=True)
                  time.sleep(2)
             
-            # Dialog ichidagi tugmani qidirish
+            # Unfollow tugmasi
             unfollow_btn = dialog.locator('button').filter(has_text=re.compile(r"Unfollow|Отменить|Obunani bekor qilish|Takibi Bırak|Bekor qilish", re.IGNORECASE)).first
             
             if unfollow_btn.is_visible():
                 unfollow_btn.click()
                 time.sleep(2)
                 
-                # Bazani yangilash
                 database.update_status(username, 'unfollowed')
-                
                 _, daily_unfollow = database.get_today_stats()
                 logger.info(f"{Fore.RED}🚫 Unfollow: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
                 return True
             else:
-                # DEBUG: Dialogdagi barcha tugmalarni ko'rish
-                try:
-                    if dialog.is_visible():
-                        dialog_text = dialog.inner_text()
-                        all_btns = dialog.locator('button').all_inner_texts()
-                        logger.warning(f"⚠️ Unfollow modali: Tugma yo'q. Dialog matni: {dialog_text[:50]}... Tugmalar: {all_btns}")
-                        
-                        # Fallback: Agar "Отменить" yoki qizil rangli tugma bo'lsa
-                        for btn_text in all_btns:
-                            if "otmenit" in btn_text.lower() or "bekor" in btn_text.lower() or "unfollow" in btn_text.lower():
-                                logger.info(f"🔄 Fallback Unfollow: {btn_text}")
-                                dialog.locator('button').filter(has_text=btn_text).click()
-                                database.update_status(username, 'unfollowed')
-                                return True
-                    else:
-                        logger.warning(f"⚠️ Unfollow modali umuman chiqmadi @{username}")
-                except:
-                    pass
+                if dialog.is_visible():
+                    dialog_text = dialog.inner_text()
+                    all_btns = dialog.locator('button').all_inner_texts()
+                    logger.warning(f"⚠️ Unfollow modali: Tugma yo'q. Dialog: {dialog_text[:50]}... Btns: {all_btns}")
+                else:
+                    logger.warning(f"⚠️ Unfollow modali umuman chiqmadi @{username}")
                     
                 return False
                 
