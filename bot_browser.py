@@ -1333,11 +1333,21 @@ class InstagramBrowserBot:
                 
                 followers_count = count
                 
-                # Scroll
+                # Scroll (Javascript - Collect followers dagi kabi)
                 try:
-                     dialog = self.page.locator('div[role="dialog"]').first
-                     self.page.evaluate("arguments[0].scrollTop += 3000", dialog.element_handle())
-                     time.sleep(2) # Stabilroq ishlash uchun 2s
+                    self.page.evaluate("""() => {
+                        const dialog = document.querySelector('div[role="dialog"]');
+                        if (dialog) {
+                            const divs = dialog.querySelectorAll('div');
+                            for (const div of divs) {
+                                if (div.scrollHeight > div.clientHeight) {
+                                    div.scrollTop += 800;
+                                    break;
+                                }
+                            }
+                        }
+                    }""")
+                    time.sleep(2) # Stabilroq ishlash uchun 2s
                 except:
                     pass
                 
