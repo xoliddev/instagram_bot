@@ -1085,6 +1085,7 @@ class InstagramBrowserBot:
                         
                         unlike_svgs = self.page.locator(unlike_selector)
                         is_liked = False
+                        clicked = False  # To prevent UnboundLocalError
                         
                         # Barcha unlike tugmalarini tekshiramiz (qaysidir biri ko'rinib turgandir)
                         for i in range(unlike_svgs.count()):
