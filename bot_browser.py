@@ -929,16 +929,20 @@ class InstagramBrowserBot:
                 time.sleep(watch_time)
                 
                 # Random Like (50% ehtimol)
-                if random.random() < 0.5:
+                # Random Like (100% ehtimol - Test uchun)
+                if random.random() < 1.0:
                     try:
-                        # Like tugmasini qidirish (Kengaytirilgan Regex)
-                        # EN: Like, RU: Нравится, UZ: Yoqtirish, TR: Beğen
-                        like_selector = re.compile(r"Like|Нравится|Yoqtirish|Beğen|J'aime", re.IGNORECASE)
+                        # Like tugmasini qidirish (CSS Selector - ishonchli)
+                        # EN: Like, RU: Нравится, UZ: Yoqtirish, TR: Beğen, FR: J'aime
+                        like_selector = (
+                            'svg[aria-label*="Like"], '
+                            'svg[aria-label*="Нравится"], '
+                            'svg[aria-label*="Yoqtirish"], '
+                            'svg[aria-label*="Beğen"], '
+                            'svg[aria-label*="J\'aime"]'
+                        )
                         
-                        like_btn = self.page.locator('svg').filter(has_text=like_selector).first # Text bo'lmasligi mumkin
-                        if not like_btn.is_visible():
-                             # Attribute bo'yicha qidirish
-                             like_btn = self.page.locator('svg[aria-label]').filter(has_text=like_selector).first
+                        like_btn = self.page.locator(like_selector).first
                         
                         if like_btn.is_visible():
                             like_btn.click()
@@ -946,14 +950,13 @@ class InstagramBrowserBot:
                             self.send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> <a href='https://instagram.com/{current_username}'>@{current_username}</a>")
                             time.sleep(1)
                         else:
-                             # DEBUG: Tugma topilmadi - Sahifadagi barcha aria-label larni ko'rish
+                             # DEBUG: Tugma topilmadi
                              try:
-                                 # Bir marta Telegramga tashlash (Debug uchun)
                                  if not hasattr(self, 'debug_sent'):
-                                     all_labels = self.page.locator('[aria-label]').all_get_attributes('aria-label')
-                                     readable_labels = [l for l in all_labels if l and len(l) < 20] # Qisqa label lar
+                                     all_labels = self.page.locator('svg[aria-label]').all_get_attributes('aria-label')
+                                     readable_labels = [l for l in all_labels if l and len(l) < 30]
                                      logger.warning(f"⚠️ Like topilmadi. Mavjud: {readable_labels}")
-                                     self.send_telegram_msg(f"⚠️ <b>DEBUG (Like topilmadi):</b>\nEkranda bor: {', '.join(readable_labels)}")
+                                     self.send_telegram_msg(f"⚠️ <b>DEBUG (Like topilmadi):</b>\nEkranda: {', '.join(readable_labels)}")
                                      self.debug_sent = True
                              except:
                                  pass
