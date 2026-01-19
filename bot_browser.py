@@ -1070,6 +1070,7 @@ class InstagramBrowserBot:
                 if random.random() < 1.0:
                     try:
                         # 1. AVVAL TEKSHIRAMIZ: Allaqaqchon like bosilganmi?
+                        # Unlike tugmasini qidirish (Barchasini tekshiramiz)
                         unlike_selector = (
                             'svg[aria-label*="Unlike"], '
                             'svg[aria-label*="O\'chirish"], '
@@ -1077,7 +1078,17 @@ class InstagramBrowserBot:
                             'svg[aria-label*="Vazgeç"], '
                             'svg[aria-label*="Je n\'aime plus"]'
                         )
-                        if self.page.locator(unlike_selector).first.is_visible():
+                        
+                        unlike_svgs = self.page.locator(unlike_selector)
+                        is_liked = False
+                        
+                        # Barcha unlike tugmalarini tekshiramiz (qaysidir biri ko'rinib turgandir)
+                        for i in range(unlike_svgs.count()):
+                            if unlike_svgs.nth(i).is_visible():
+                                is_liked = True
+                                break
+                        
+                        if is_liked:
                             logger.info(f"ℹ️ {current_username}: Storyga allaqachon like bosilgan.")
                         else:
                             # Like bosish
@@ -1097,6 +1108,7 @@ class InstagramBrowserBot:
                             for i in range(count):
                                 svg = like_svgs.nth(i)
                                 if svg.is_visible():
+                                    # Parent (Button) ni olish
                                     like_btn = svg.locator("..")
                                     like_btn.click(force=True)
                                     clicked = True
