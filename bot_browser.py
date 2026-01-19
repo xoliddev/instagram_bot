@@ -772,6 +772,26 @@ class InstagramBrowserBot:
                 logger.warning("⚠️ Kunlik unfollow limiti tugadi")
                 break
             
+            # 24 soatlik himoya va Status tekshiruvi w
+            user_data = database.get_user(username)
+            if user_data:
+                # 1. Agar statusi 'followed_back' bo'lsa (lekin followers listda ko'rinmasa ham)
+                if user_data.get('status') == 'followed_back':
+                     logger.info(f"⏭️ @{username} o'tkazib yuborildi (Status: followed_back)")
+                     continue
+                
+                # 2. Agar 24 soat o'tmagan bo'lsa
+                if user_data.get('followed_at'):
+                    try:
+                        followed_at = datetime.fromisoformat(user_data['followed_at'])
+                        hours_diff = (datetime.now() - followed_at).total_seconds() / 3600
+                        if hours_diff < 24:
+                            logger.info(f"⏭️ @{username} o'tkazib yuborildi (Hali 24 soat bo'lmadi: {hours_diff:.1f}s)")
+                            time.sleep(0.1)
+                            continue
+                    except:
+                        pass
+
             try:
                 if self.unfollow_user(username):
                     unfollowed += 1
@@ -779,7 +799,10 @@ class InstagramBrowserBot:
                     
                     delay = self.get_human_delay(config.UNFOLLOW_DELAY_MIN, config.UNFOLLOW_DELAY_MAX)
                     logger.info(f"⏳ {delay} sekund kutilmoqda...")
-                    time.sleep(delay)
+                    
+                    # Smart sleep (Buyruq o'zgarsa)
+                    if self.smart_sleep(delay):
+                        break
             except Exception as e:
                 logger.error(f"❌ @{username} unfollow xatosi: {e}")
                 result["errors"] += 1
