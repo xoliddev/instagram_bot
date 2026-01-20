@@ -1016,6 +1016,12 @@ class InstagramBrowserBot:
             if "Target page, context or browser has been closed" in str(e):
                 raise e
             logger.error(f"❌ Unfollow xatosi @{username}: {e}")
+            
+            # Fail count ni oshirish va 3 dan oshsa blocked deb belgilash
+            fail_count = database.increment_fail_count(username)
+            if fail_count >= 3:
+                database.mark_as_blocked(username)
+            
             return False
     
     def watch_stories_and_like(self, duration: int):
@@ -1496,9 +1502,19 @@ def main():
         database.set_config("current_cycle", "auto")
         database.set_config("strict_mode", "false")
         
+        # Har soatlik sync uchun vaqtni eslab qolamiz
+        last_sync_time = datetime.now()
+        
         try:
             while True:
                 try:
+                    # 🔄 HAR SOATLIK SYNC: Yangi followerlarni tekshirish
+                    hours_since_sync = (datetime.now() - last_sync_time).total_seconds() / 3600
+                    if hours_since_sync >= 1:
+                        logger.info("🔄 Har soatlik sync: Yangi followerlar tekshirilmoqda...")
+                        bot.sync_my_followers()
+                        last_sync_time = datetime.now()
+                    
                     # 1. State tekshirish (Bazadan)
                     current_cycle = database.get_config("current_cycle", "auto")
                     collect_target = database.get_config("collect_target")
@@ -1563,7 +1579,11 @@ def main():
                         # 1. Follow (FAQAT Pending userlar)
                         pending_count = database.get_pending_count()
                         
-                        if pending_count > 0:
+                        # LIMIT TEKSHIRISH (Spam oldini olish)
+                        daily_follow, _ = database.get_today_stats()
+                        if daily_follow >= config.DAILY_FOLLOW_LIMIT:
+                            logger.info(f"💤 Kunlik follow limiti tugadi ({daily_follow}/{config.DAILY_FOLLOW_LIMIT}). Keyingi kunga kutamiz.")
+                        elif pending_count > 0:
                             logger.info(f"📋 Pending userlar mavjud: {pending_count} ta. Bazadan olinmoqda...")
                             pending_users = database.get_pending_users(20)
                             

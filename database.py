@@ -25,12 +25,20 @@ def init_db():
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     username TEXT PRIMARY KEY,
-                    status TEXT DEFAULT 'waiting', -- waiting, followed_back, unfollowed
+                    status TEXT DEFAULT 'waiting', -- waiting, followed_back, unfollowed, blocked
                     followed_at TIMESTAMP,
                     unfollowed_at TIMESTAMP,
-                    checked BOOLEAN DEFAULT 0
+                    checked BOOLEAN DEFAULT 0,
+                    fail_count INTEGER DEFAULT 0
                 )
             """)
+            
+            # fail_count columnini qo'shish (eski bazalar uchun migratsiya)
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN fail_count INTEGER DEFAULT 0")
+                logger.info("✅ fail_count columni qo'shildi")
+            except:
+                pass  # Column allaqachon mavjud
             
             # Daily stats jadvali
             cursor.execute("""
@@ -279,3 +287,44 @@ def get_config(key: str, default=None):
         logger.error(f"❌ DB Get config error: {e}")
         return default
 
+def increment_fail_count(username: str) -> int:
+    """User fail_count ni 1 ga oshirish va yangi qiymatni qaytarish"""
+    try:
+        with closing(get_connection()) as conn:
+            with conn:
+                conn.execute("UPDATE users SET fail_count = COALESCE(fail_count, 0) + 1 WHERE username = ?", (username,))
+            cursor = conn.execute("SELECT fail_count FROM users WHERE username = ?", (username,))
+            result = cursor.fetchone()
+            return result['fail_count'] if result else 0
+    except Exception as e:
+        logger.error(f"❌ DB Increment fail count error: {e}")
+        return 0
+
+def mark_as_blocked(username: str):
+    """Userni blocked deb belgilash (3 marta xato bo'lganda)"""
+    try:
+        with closing(get_connection()) as conn:
+            with conn:
+                conn.execute("UPDATE users SET status = 'blocked' WHERE username = ?", (username,))
+        logger.info(f"🚫 @{username} blocked deb belgilandi (3+ marta xato)")
+        return True
+    except Exception as e:
+        logger.error(f"❌ DB Mark as blocked error: {e}")
+        return False
+
+def get_waiting_users_for_unfollow(limit=20):
+    """Waiting statusdagi userlar (blocked bo'lmaganlari)"""
+    try:
+        with closing(get_connection()) as conn:
+            cursor = conn.execute("""
+                SELECT username, followed_at, fail_count 
+                FROM users 
+                WHERE status = 'waiting' 
+                  AND (fail_count IS NULL OR fail_count < 3)
+                ORDER BY followed_at ASC
+                LIMIT ?
+            """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"❌ DB Get waiting users error: {e}")
+        return []
