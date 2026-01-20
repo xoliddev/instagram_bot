@@ -876,8 +876,6 @@ class InstagramBrowserBot:
             logger.info(f"🔍 User ID qidirilmoqda: @{username}")
             # 2. User ID ni olish (JavaScript orqali)
             user_id = None
-            # 2. User ID ni olish (JavaScript orqali)
-            user_id = None
             try:
                 # Method 1: API orqali (Eng ishonchli)
                 profile_json_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
@@ -891,11 +889,15 @@ class InstagramBrowserBot:
                         }});
                         const data = await resp.json();
                         return {{
-                            id: data.data.user.id,
-                            follows_viewer: data.data.user.follows_viewer
+                            id: data.data?.user?.id,
+                            follows_viewer: data.data?.user?.follows_viewer,
+                            status: data.status,
+                            error: data.message
                         }};
-                    }} catch(e) {{ return null; }}
+                    }} catch(e) {{ return {{ error: e.toString() }}; }}
                 }}""")
+                
+                logger.info(f"📨 API Response @{username}: {user_info}")
                 
                 if user_info and user_info.get('id'):
                     user_id = user_info['id']
@@ -905,10 +907,16 @@ class InstagramBrowserBot:
                          logger.warning(f"🛑 @{username} sizga follow qilgan! (Unfollow bekor qilindi)")
                          database.update_status(username, 'followed_back')
                          return False
+                elif user_info and user_info.get('error'):
+                    # API xatosi - ehtimol profil mavjud emas
+                    logger.warning(f"⚠️ @{username} - API xatosi: {user_info.get('error')}")
                 
-                # Method 2: Meta taglardan (Fallback)
+                # Method 2: Meta taglardan (Fallback - 5s timeout)
                 if not user_id:
-                     user_id = self.page.locator('meta[property="instapp:owner_user_id"]').get_attribute('content')
+                    try:
+                        user_id = self.page.locator('meta[property="instapp:owner_user_id"]').get_attribute('content', timeout=5000)
+                    except:
+                        pass
             except Exception as e:
                 logger.warning(f"⚠️ User ID olishda xato: {e}")
             
