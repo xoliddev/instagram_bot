@@ -866,7 +866,12 @@ class InstagramBrowserBot:
                     return False
 
             except Exception as e:
-                logger.warning(f"⚠️ Profil yuklashda timeout (lekin davom etamiz): {e}")
+                logger.warning(f"⚠️ Profil yuklanmadi @{username}: {e}")
+                # Fail count ni oshirish va skip qilish
+                fail_count = database.increment_fail_count(username)
+                if fail_count >= 3:
+                    database.mark_as_blocked(username)
+                return False
 
             logger.info(f"🔍 User ID qidirilmoqda: @{username}")
             # 2. User ID ni olish (JavaScript orqali)
