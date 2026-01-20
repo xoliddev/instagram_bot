@@ -62,14 +62,15 @@ def import_json_to_db(data: dict) -> bool:
         # Users import
         for user in data.get("users", []):
             cursor.execute("""
-                INSERT OR REPLACE INTO users (username, status, followed_at, unfollowed_at, checked)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO users (username, status, followed_at, unfollowed_at, checked, fail_count)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 user.get("username"),
                 user.get("status"),
                 user.get("followed_at"),
                 user.get("unfollowed_at"),
-                user.get("checked", 0)
+                user.get("checked", 0),
+                user.get("fail_count", 0)
             ))
         
         # Daily stats import
