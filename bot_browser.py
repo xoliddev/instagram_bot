@@ -646,16 +646,22 @@ class InstagramBrowserBot:
         """24 soat o'tganlarni tekshirish va unfollow qilish"""
         logger.info("🔍 24 soat tekshiruvi boshlanmoqda...")
         
-        waiting_users = database.get_waiting_users()
+        # Blocked bo'lmaganlarni olish (fail_count < 3)
+        waiting_users = database.get_waiting_users_for_unfollow(50)
         if not waiting_users:
             logger.info("✅ Tekshiradiganlar yo'q")
             return
 
-        my_followers = self.get_my_followers()
+        # BAZADAN followerlarni olish (UI emas!)
+        my_followers = database.get_followers_from_db()
+        logger.info(f"📊 Bazadan {len(my_followers)} ta follower topildi")
+        
         now = datetime.now()
         to_unfollow = []
         
         for user in waiting_users:
+            if not user.get('followed_at'):
+                continue
             followed_at = datetime.fromisoformat(user['followed_at'])
             hours = (now - followed_at).total_seconds() / 3600
             
@@ -669,7 +675,6 @@ class InstagramBrowserBot:
                     to_unfollow.append(username)
                     logger.info(f"{Fore.YELLOW}❌ @{username} follow qaytarmagan ({hours:.1f} soat)")
         
-        # Unfollow
         # Unfollow
         for username in to_unfollow:
             # 0. Buyruqni tekshirish

@@ -233,6 +233,16 @@ def get_total_stats():
         logger.error(f"❌ DB Get total stats error: {e}")
         return 0, 0, 0
 
+def get_followers_from_db() -> set:
+    """Bazadagi barcha 'followed_back' userlarni olish (synclangan followerlar)"""
+    try:
+        with closing(get_connection()) as conn:
+            cursor = conn.execute("SELECT username FROM users WHERE status = 'followed_back'")
+            return {row['username'] for row in cursor.fetchall()}
+    except Exception as e:
+        logger.error(f"❌ DB Get followers error: {e}")
+        return set()
+
 def get_all_users_by_status(status: str = None):
     """Statusga ko'ra userlarni olish"""
     try:
