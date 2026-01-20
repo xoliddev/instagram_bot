@@ -912,6 +912,14 @@ class InstagramBrowserBot:
             except Exception as e:
                 logger.warning(f"⚠️ User ID olishda xato: {e}")
             
+            # Agar user_id topilmasa - skip qilish!
+            if not user_id:
+                logger.warning(f"⚠️ @{username} uchun User ID topilmadi. Skip qilinmoqda...")
+                fail_count = database.increment_fail_count(username)
+                if fail_count >= 3:
+                    database.mark_as_blocked(username)
+                return False
+            
             # 3. API orqali Unfollow (Tugma bosishsiz!)
             if user_id:
                 logger.info(f"🔧 API Unfollow: @{username} (ID: {user_id})")
