@@ -1107,6 +1107,9 @@ class InstagramBrowserBot:
                     return
 
             # 3. Loop: Story ko'rish va like bosish
+            same_user_count = 0  # Bir xil user takrorlanish hisoblagichi
+            last_user = None  # Oldingi ko'rilgan user
+            
             while (time.time() - start_time) < duration:
                 # Qancha vaqt qoldi?
                 remaining = duration - (time.time() - start_time)
@@ -1144,6 +1147,16 @@ class InstagramBrowserBot:
                         pass
                     
                     time.sleep(0.5) # URL yangilanishini kutish
+
+                # STUCK DETECTION: Agar bir xil user 20+ marta ko'rinsa, story qotib qolgan
+                if current_username == last_user:
+                    same_user_count += 1
+                    if same_user_count >= 20:
+                        logger.warning(f"⚠️ Story qotib qoldi ({current_username} 20+ marta). Chiqilmoqda...")
+                        break
+                else:
+                    same_user_count = 0
+                    last_user = current_username
 
                 logger.info(f"👀 Story ko'rilmoqda: @{current_username} ({watch_time}s)")
                 
@@ -1266,6 +1279,9 @@ class InstagramBrowserBot:
             
         # Agar vaqt ortib qolsa - lekin buyruq o'zgarsa chiqib ketish kerak
         remaining = duration - (time.time() - start_time)
+        # MAX 1 soat kutish (uzun hang ni oldini olish)
+        remaining = min(remaining, 3600)
+        
         if remaining > 0:
             logger.info(f"⏳ Qolgan vaqt: {int(remaining)}s. (Buyruqlar kutilmoqda...)")
             
