@@ -73,15 +73,7 @@ def get_random_target() -> str:
     return random.choice(targets) if targets else "muhibulloh_"
 
 # ============ BOT STATE ============
-class BotState:
-    is_running = False
-    current_cycle = None
-    last_action = None
-    instagram_bot = None
-    collect_target = None
-    collect_count = 1000
 
-state = BotState()
 
 # ============ LOGGING ============
 logging.basicConfig(level=logging.INFO)
@@ -108,12 +100,14 @@ async def cmd_start(message: Message):
         await message.answer("⛔ Sizda ruxsat yo'q.")
         return
     
-    text = """
+    args = message.text.split()
+    
+    text = f"""
 🤖 <b>Instagram Bot Controller</b>
 
 <b>Buyruqlar:</b>
 📊 /stats - Statistika
-▶️ /follow [son] - Follow sikli
+▶️ /follow [son] - Follow sikli (Direct)
 ⏹️ /unfollow - Unfollow sikli
 🧹 /cleanup - Following tozalash
 👎 /non_followers - Follow qaytarmaganlar
@@ -129,7 +123,7 @@ async def cmd_start(message: Message):
 ➕ /add_target [@username]
 ➖ /remove_target [@username]
 
-<b>Holat:</b> """ + ("🟢 Ishlayapti" if state.is_running else "🔴 Kutish rejimi")
+<b>Holat:</b> 🟢 Ishlayapti (Cycle: {database.get_config('current_cycle', 'auto')})"""
     
     await message.answer(text)
 
@@ -157,7 +151,8 @@ async def cmd_stats(message: Message):
 <b>Targetlar:</b> {len(targets)} ta
 └ {', '.join(['@'+t for t in targets[:5]])}{'...' if len(targets) > 5 else ''}
 
-<b>Bot holati:</b> {"🟢 Ishlayapti" if state.is_running else "🔴 Kutish"}
+<b>Bot holati:</b> 🟢 Ishlayapti
+<b>Sikl:</b> {database.get_config('current_cycle', 'auto')}
 """
     await message.answer(text)
 
@@ -314,8 +309,8 @@ async def cmd_follow(message: Message):
     if not is_admin(message.from_user.id):
         return
     
-    if state.is_running:
-        await message.answer("⚠️ Bot allaqachon ishlayapti. Kuting...")
+    if database.get_config("current_cycle") == "follow":
+        await message.answer("⚠️ Bot allaqachon follow rejimida. Kuting...")
         return
     
     args = message.text.split()
@@ -327,17 +322,17 @@ async def cmd_follow(message: Message):
     await message.answer(f"▶️ Follow sikli boshlanmoqda...\n\n🎯 Target: @{target}\n👥 Limit: {count}")
     
     # Signal Instagram bot to start
-    state.current_cycle = "follow"
-    state.last_action = datetime.now()
-    # TODO: Actual integration with bot_browser
+    database.set_config("current_cycle", "follow")
+    database.set_config("follow_target", target)
+    database.set_config("follow_count", str(count))
 
 @router.message(Command("unfollow"))
 async def cmd_unfollow(message: Message):
     if not is_admin(message.from_user.id):
         return
     
-    if state.is_running:
-        await message.answer("⚠️ Bot allaqachon ishlayapti.")
+    if database.get_config("current_cycle") == "cleanup":
+        await message.answer("⚠️ Bot allaqachon cleanup rejimida.")
         return
     
     await message.answer("🔍 Unfollow sikli boshlanmoqda...\n\n<i>24 soat o'tgan va follow qaytarmaganlar tozalanadi.</i>")

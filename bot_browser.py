@@ -1621,6 +1621,22 @@ def main():
                         database.set_config("current_cycle", "auto")
 
                     # ------------------------------------------
+                    # MODE 4: FOLLOW (Direct Follow)
+                    # ------------------------------------------
+                    elif current_cycle == 'follow':
+                        target = database.get_config("follow_target")
+                        count = int(database.get_config("follow_count", "20"))
+                        
+                        logger.info(f"\n{'='*40}")
+                        logger.info(f"🚀 FOLLOW CYCLE BOSHLANDI: @{target} ({count} ta)")
+                        logger.info(f"{'='*40}")
+                        
+                        bot.run_follow_cycle(count, target)
+                        
+                        logger.info("✅ Follow sikli tugadi. Auto rejimga qaytilmoqda.")
+                        database.set_config("current_cycle", "auto")
+
+                    # ------------------------------------------
                     # MODE 3: AUTO (Faqat Baza bilan ishlash)
                     # ------------------------------------------
                     else:
