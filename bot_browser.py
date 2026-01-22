@@ -81,16 +81,15 @@ class InstagramBrowserBot:
                 locale="en-US"
             )
             
-            # 🍪 Cookie'larni yuklash (Koyeb uchun)
-            cookie_file = Path("playwright_cookies.json")
-            if cookie_file.exists():
-                try:
-                    with open(cookie_file, 'r', encoding='utf-8') as f:
-                        cookies = json.load(f)
-                        self.context.add_cookies(cookies)
-                        logger.info(f"🍪 {len(cookies)} ta cookie yuklandi")
-                except Exception as e:
-                    logger.error(f"❌ Cookie yuklash xatosi: {e}")
+            # 🍪 Cookie'larni Gist dan yuklash (Koyeb uchun)
+            try:
+                import backup
+                cookies = backup.restore_cookies_from_gist()
+                if cookies:
+                    self.context.add_cookies(cookies)
+                    logger.info(f"🍪 Gist dan {len(cookies)} ta cookie yuklandi")
+            except Exception as e:
+                logger.warning(f"⚠️ Cookie yuklash xatosi: {e}")
             
             self.page = self.context.new_page()
             self.page.set_default_timeout(30000)
@@ -146,6 +145,14 @@ class InstagramBrowserBot:
             # Tekshirish
             if self._is_logged_in():
                 logger.info("✅ Login muvaffaqiyatli!")
+                
+                # 🍪 Cookies ni Gist ga saqlash (restart dan keyin ham ishlashi uchun)
+                try:
+                    import backup
+                    cookies = self.context.cookies()
+                    backup.backup_cookies_to_gist(cookies)
+                except Exception as e:
+                    logger.warning(f"⚠️ Cookie backup xatosi: {e}")
                 
                 # "Save Info" popup yopish
                 try:
@@ -1680,8 +1687,13 @@ def main():
                             logger.info(f"✅ Pending userlardan {count} tasi follow qilindi")
                             
                         else:
-                            # ⚠️ QIDIRUV YO'Q! (Database-First)
-                            logger.info("💤 Baza bo'sh. Yangi userlar uchun /collect buyrug'ini ishlating.")
+                            # ⚠️ FALLBACK: Pending bo'sh - random targetdan follow qilish
+                            random_target = database.get_random_target()
+                            if random_target:
+                                logger.info(f"🎲 Pending bo'sh. Random target tanlandi: @{random_target}")
+                                bot.run_follow_cycle(20, random_target)
+                            else:
+                                logger.info("💤 Baza bo'sh va target yo'q. /add_target yoki /collect buyrug'ini ishlating.")
                             
                         bot.show_stats()
                         

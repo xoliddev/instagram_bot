@@ -48,29 +48,18 @@ def save_admins(admins: list):
     with open(ADMINS_FILE, 'w') as f:
         json.dump(admins, f)
 
-def load_targets() -> list:
-    """Targetlar ro'yxatini yuklash"""
+def migrate_targets_to_db():
+    """Eski JSON targetlarni bazaga ko'chirish (bir martalik)"""
     if TARGETS_FILE.exists():
         try:
             with open(TARGETS_FILE, 'r') as f:
-                return json.load(f)
-        except:
-            pass
-    # Boshlang'ich target
-    default = [os.getenv("TARGET_ACCOUNT", "muhibulloh_")]
-    save_targets(default)
-    return default
-
-def save_targets(targets: list):
-    """Targetlarni saqlash"""
-    with open(TARGETS_FILE, 'w') as f:
-        json.dump(targets, f)
-
-def get_random_target() -> str:
-    """Tasodifiy target olish"""
-    import random
-    targets = load_targets()
-    return random.choice(targets) if targets else "muhibulloh_"
+                targets = json.load(f)
+            for t in targets:
+                database.add_target(t)
+            TARGETS_FILE.unlink()  # Faylni o'chirish
+            logger.info(f"✅ {len(targets)} ta target bazaga ko'chirildi")
+        except Exception as e:
+            logger.warning(f"⚠️ Target migratsiya: {e}")
 
 # ============ BOT STATE ============
 
@@ -133,8 +122,8 @@ async def cmd_stats(message: Message):
         return
     
     today_follow, today_unfollow = database.get_today_stats()
-    total, waiting, backed = database.get_total_stats()
-    targets = load_targets()
+    status_counts = database.get_status_counts()
+    target_count = database.get_target_count()
     
     text = f"""
 📊 <b>Statistika</b>
@@ -143,15 +132,14 @@ async def cmd_stats(message: Message):
 ├ ➕ Follow: {today_follow}
 └ ➖ Unfollow: {today_unfollow}
 
-<b>Umumiy:</b>
-├ 👥 Jami: {total}
-├ ⏳ Kutilmoqda: {waiting}
-└ ✅ Follow back: {backed}
+<b>Bazadagi userlar:</b> {status_counts['total']} ta
+├ 📥 Pending: {status_counts['pending']}
+├ ⏳ Waiting: {status_counts['waiting']}
+├ ✅ Followed Back: {status_counts['followed_back']}
+├ 🚫 Unfollowed: {status_counts['unfollowed']}
+└ ❌ Blocked: {status_counts['blocked']}
 
-<b>Targetlar:</b> {len(targets)} ta
-└ {', '.join(['@'+t for t in targets[:5]])}{'...' if len(targets) > 5 else ''}
-
-<b>Bot holati:</b> 🟢 Ishlayapti
+<b>🎯 Targetlar:</b> {target_count} ta
 <b>Sikl:</b> {database.get_config('current_cycle', 'auto')}
 """
     await message.answer(text)
@@ -193,16 +181,16 @@ async def cmd_targets(message: Message):
     if not is_admin(message.from_user.id):
         return
     
-    targets = load_targets()
+    targets = database.get_all_targets()
     if not targets:
-        await message.answer("🎯 Targetlar ro'yxati bo'sh.")
+        await message.answer("🎯 Targetlar ro'yxati bo'sh.\n\nQo'shish: /add_target @username")
         return
     
     text = "🎯 <b>Targetlar:</b>\n\n"
     for i, t in enumerate(targets, 1):
         text += f"{i}. @{t}\n"
     
-    text += f"\n<i>Har sikl boshida tasodifiy tanlanadi</i>"
+    text += f"\n<i>Pending bo'sh bo'lganda random tanlanadi</i>"
     await message.answer(text)
 
 @router.message(Command("add_target"))
@@ -220,14 +208,13 @@ async def cmd_add_target(message: Message):
         await message.answer("❌ Username kiriting.")
         return
     
-    targets = load_targets()
+    targets = database.get_all_targets()
     if username in targets:
         await message.answer(f"⚠️ @{username} allaqachon ro'yxatda.")
         return
     
-    targets.append(username)
-    save_targets(targets)
-    await message.answer(f"✅ @{username} qo'shildi!\n\n🎯 Jami: {len(targets)} ta target")
+    database.add_target(username)
+    await message.answer(f"✅ @{username} qo'shildi!\n\n🎯 Jami: {len(targets) + 1} ta target")
 
 @router.message(Command("remove_target"))
 async def cmd_remove_target(message: Message):
@@ -240,19 +227,14 @@ async def cmd_remove_target(message: Message):
         return
     
     username = args[1].strip().lstrip("@")
-    targets = load_targets()
+    targets = database.get_all_targets()
     
     if username not in targets:
         await message.answer(f"⚠️ @{username} ro'yxatda yo'q.")
         return
     
-    if len(targets) <= 1:
-        await message.answer("❌ Kamida 1 ta target bo'lishi kerak!")
-        return
-    
-    targets.remove(username)
-    save_targets(targets)
-    await message.answer(f"✅ @{username} o'chirildi!\n\n🎯 Qoldi: {len(targets)} ta target")
+    database.remove_target(username)
+    await message.answer(f"✅ @{username} o'chirildi!\n\n🎯 Qoldi: {len(targets) - 1} ta target")
 
 @router.message(Command("add_admin"))
 async def cmd_add_admin(message: Message):
@@ -318,7 +300,11 @@ async def cmd_follow(message: Message):
     if len(args) > 1 and args[1].isdigit():
         count = min(int(args[1]), 50)  # Max 50
     
-    target = get_random_target()
+    target = database.get_random_target()
+    if not target:
+        await message.answer("⚠️ Target yo'q! Avval /add_target @username bilan qo'shing.")
+        return
+        
     await message.answer(f"▶️ Follow sikli boshlanmoqda...\n\n🎯 Target: @{target}\n👥 Limit: {count}")
     
     # Signal Instagram bot to start

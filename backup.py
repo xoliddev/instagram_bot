@@ -209,3 +209,73 @@ def auto_restore_if_empty():
     except Exception as e:
         logger.error(f"❌ Auto-restore xatosi: {e}")
         return restore_from_gist()
+
+# ============ COOKIE BACKUP ============
+
+COOKIE_BACKUP_FILE = "instagram_cookies.json"
+
+def backup_cookies_to_gist(cookies: list) -> bool:
+    """Playwright cookies ni Gist ga saqlash"""
+    if not GITHUB_TOKEN or not GIST_ID:
+        logger.warning("⚠️ Cookie backup: GITHUB_TOKEN yoki GIST_ID yo'q")
+        return False
+    
+    content = json.dumps(cookies, indent=2, ensure_ascii=False)
+    
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    try:
+        url = f"https://api.github.com/gists/{GIST_ID}"
+        response = requests.patch(url, headers=headers, json={
+            "files": {
+                COOKIE_BACKUP_FILE: {"content": content}
+            }
+        })
+        
+        if response.status_code == 200:
+            logger.info(f"✅ Cookies Gist ga saqlandi: {len(cookies)} ta cookie")
+            return True
+        else:
+            logger.error(f"❌ Cookie backup xatosi: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Cookie backup xatosi: {e}")
+        return False
+
+def restore_cookies_from_gist() -> list:
+    """Gist dan cookies ni yuklash"""
+    if not GITHUB_TOKEN or not GIST_ID:
+        return []
+    
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    try:
+        url = f"https://api.github.com/gists/{GIST_ID}"
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code != 200:
+            return []
+        
+        gist_data = response.json()
+        files = gist_data.get("files", {})
+        
+        if COOKIE_BACKUP_FILE not in files:
+            logger.info("ℹ️ Gist da cookie topilmadi")
+            return []
+        
+        content = files[COOKIE_BACKUP_FILE].get("content", "[]")
+        cookies = json.loads(content)
+        logger.info(f"✅ Gist dan {len(cookies)} ta cookie yuklandi")
+        return cookies
+        
+    except Exception as e:
+        logger.error(f"❌ Cookie restore xatosi: {e}")
+        return []
+

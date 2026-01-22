@@ -57,8 +57,16 @@ def init_db():
                 )
             """)
             
+            # Targets jadvali (Follow qilish uchun targetlar)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS targets (
+                    username TEXT PRIMARY KEY,
+                    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             conn.commit()
-            logger.info("✅ Baza ishga tushdi (users, daily_stats, config)")
+            logger.info("✅ Baza ishga tushdi (users, daily_stats, config, targets)")
     except Exception as e:
         logger.error(f"❌ Baza yaratish xatosi: {e}")
 
@@ -338,3 +346,84 @@ def get_waiting_users_for_unfollow(limit=20):
     except Exception as e:
         logger.error(f"❌ DB Get waiting users error: {e}")
         return []
+
+# ============ TARGET MANAGEMENT ============
+
+def add_target(username: str) -> bool:
+    """Yangi target qo'shish"""
+    try:
+        with closing(get_connection()) as conn:
+            with conn:
+                conn.execute("""
+                    INSERT OR IGNORE INTO targets (username, added_at)
+                    VALUES (?, ?)
+                """, (username, datetime.now()))
+        return True
+    except Exception as e:
+        logger.error(f"❌ DB Add target error: {e}")
+        return False
+
+def remove_target(username: str) -> bool:
+    """Targetni o'chirish"""
+    try:
+        with closing(get_connection()) as conn:
+            with conn:
+                conn.execute("DELETE FROM targets WHERE username = ?", (username,))
+        return True
+    except Exception as e:
+        logger.error(f"❌ DB Remove target error: {e}")
+        return False
+
+def get_all_targets() -> list:
+    """Barcha targetlarni olish"""
+    try:
+        with closing(get_connection()) as conn:
+            cursor = conn.execute("SELECT username FROM targets ORDER BY added_at ASC")
+            return [row['username'] for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"❌ DB Get targets error: {e}")
+        return []
+
+def get_random_target() -> str:
+    """Random target olish"""
+    import random
+    targets = get_all_targets()
+    return random.choice(targets) if targets else None
+
+def get_target_count() -> int:
+    """Targetlar soni"""
+    try:
+        with closing(get_connection()) as conn:
+            cursor = conn.execute("SELECT COUNT(*) as cnt FROM targets")
+            return cursor.fetchone()['cnt']
+    except:
+        return 0
+
+# ============ STATUS COUNTS ============
+
+def get_status_counts() -> dict:
+    """Barcha statuslar bo'yicha hisoblar"""
+    try:
+        with closing(get_connection()) as conn:
+            result = {
+                'pending': 0,
+                'waiting': 0,
+                'followed_back': 0,
+                'unfollowed': 0,
+                'blocked': 0,
+                'total': 0
+            }
+            cursor = conn.execute("""
+                SELECT status, COUNT(*) as cnt 
+                FROM users 
+                GROUP BY status
+            """)
+            for row in cursor.fetchall():
+                status = row['status'] or 'unknown'
+                if status in result:
+                    result[status] = row['cnt']
+                result['total'] += row['cnt']
+            return result
+    except Exception as e:
+        logger.error(f"❌ DB Get status counts error: {e}")
+        return {'pending': 0, 'waiting': 0, 'followed_back': 0, 'unfollowed': 0, 'blocked': 0, 'total': 0}
