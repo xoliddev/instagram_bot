@@ -960,13 +960,14 @@ class InstagramBrowserBot:
                     
                     # Tasdiqlash: Sahifani yangilab, "Follow" tugmasi borligini tekshirish
                     try:
-                        self.page.reload()
+                        # CRITICAL FIX: 30 sekund timeout qo'shildi (hang oldini olish)
+                        self.page.reload(timeout=30000)
                         time.sleep(3)
                         
                         # Buttonni kengroq qidirish (nafaqat header ichida)
                         follow_btn = self.page.locator('button').filter(has_text=re.compile(r"Follow|Obuna bo'lish|Подписаться|Takip et", re.IGNORECASE)).first
                         
-                        if follow_btn.is_visible():
+                        if follow_btn.is_visible(timeout=5000):
                             database.update_status(username, 'unfollowed')
                             _, daily_unfollow = database.get_today_stats()
                             logger.info(f"{Fore.RED}🚫 Unfollow TASDIQLANDI: @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
@@ -974,12 +975,17 @@ class InstagramBrowserBot:
                         else:
                             # Balki hali ham "Following" tur gandir?
                             following_check = self.page.locator('button').filter(has_text=re.compile(r"Following|Requested|Obuna bo'lingan", re.IGNORECASE)).first
-                            if following_check.is_visible():
+                            if following_check.is_visible(timeout=5000):
                                 logger.warning(f"⚠️ API 'ok' dedi, lekin hali ham 'Following' turibdi @{username}")
                             else:
                                 logger.warning(f"⚠️ Sahifada na Follow, na Following tugmasi topildi @{username}")
                     except Exception as verify_error:
-                         logger.warning(f"⚠️ Verifikatsiya xatosi: {verify_error}")
+                         logger.warning(f"⚠️ Verifikatsiya xatosi (30s timeout?): {verify_error}")
+                         # Agar reload xato bersa ham, API muvaffaqiyatli bo'lgan - statusni yangilaymiz
+                         database.update_status(username, 'unfollowed')
+                         _, daily_unfollow = database.get_today_stats()
+                         logger.info(f"{Fore.YELLOW}🚫 Unfollow (API orqali, UI tasdiqsiz): @{username} [{daily_unfollow}/{config.DAILY_UNFOLLOW_LIMIT}]")
+                         return True
 
                 else:
                     logger.warning(f"⚠️ API Unfollow muvaffaqiyatsiz @{username}: {api_result}. UI ga o'tilmoqda...")
