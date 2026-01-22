@@ -1063,10 +1063,14 @@ class InstagramBrowserBot:
             
             return False
     
-    def watch_stories_and_like(self, duration: int):
+    def watch_stories_and_like(self, duration: int, wait_remaining: bool = True):
         """
         Storylarni tomosha qilish va like bosish (Human-Like Behavior)
         Sleep o'rniga ishlatiladi.
+        
+        Args:
+            duration: Maksimal vaqt (sekund)
+            wait_remaining: True bo'lsa qolgan vaqtni kutadi, False bo'lsa darhol qaytadi
         """
         import re
         # Boshlang'ich siklni eslab qolamiz (agar o'zgarsa, loopni buzish uchun)
@@ -1290,7 +1294,11 @@ class InstagramBrowserBot:
         except Exception as e:
             logger.error(f"❌ Story ko'rishda xato: {e}")
             
-        # Agar vaqt ortib qolsa - lekin buyruq o'zgarsa chiqib ketish kerak
+        # Agar vaqt ortib qolsa va wait_remaining=True bo'lsa - kutish
+        if not wait_remaining:
+            logger.info("✅ Storylar tugadi. Darhol davom etilmoqda.")
+            return
+            
         remaining = duration - (time.time() - start_time)
         # MAX 1 soat kutish (uzun hang ni oldini olish)
         remaining = min(remaining, 3600)
@@ -1621,10 +1629,10 @@ def main():
                         logger.info("🍿 STORY MODE BOSHLANDI")
                         logger.info(f"{'='*40}")
                         
-                        # 1 soat davomida story ko'rish (yoki tugaguncha)
-                        bot.watch_stories_and_like(3600)
+                        # Storylarni ko'rish (tugagandan keyin KUTMASDAN davom etadi)
+                        bot.watch_stories_and_like(3600, wait_remaining=False)  # Tugagach darhol qaytadi
                         
-                        logger.info("✅ Story ko'rish tugadi. Auto rejimga qaytilmoqda.")
+                        logger.info("✅ Story ko'rish tugadi. Darhol auto rejimga qaytilmoqda.")
                         database.set_config("current_cycle", "auto")
 
                     # ------------------------------------------
