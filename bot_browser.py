@@ -751,111 +751,168 @@ class InstagramBrowserBot:
 
     def smart_cleanup_interactive(self):
         """
-        SMART CLEANUP - Bazadagi userlarni birma-bir tekshirish
-        Har bir profilga kirib "Follows you" borligini ko'radi
+        SMART CLEANUP - Real-time GraphQL API orqali:
+        1. O'z followerlarimni olish (kim meni follow qiladi)
+        2. O'z followinglarimni olish (men kimlarni follow qilaman)
+        3. Solishtirish: Men follow qilgan odam meni follow qiladimi?
+        4. Agar YO'Q → UNFOLLOW
         """
-        logger.info(f"\n{Fore.YELLOW}{'='*40}")
-        logger.info("🧹 SMART CLEANUP BOSHLANDI")
-        logger.info(f"{'='*40}{Style.RESET_ALL}")
+        logger.info(f"\n{Fore.YELLOW}{'='*50}")
+        logger.info("🧹 SMART CLEANUP (REAL-TIME GraphQL API)")
+        logger.info(f"{'='*50}{Style.RESET_ALL}")
         
-        # Bazadan waiting + followed_back userlarni olish
-        waiting_users = database.get_all_waiting_users()
-        logger.info(f"📊 Bazada {len(waiting_users)} ta tekshiriladigan user bor")
-        
-        if not waiting_users:
-            logger.info("✅ Tekshiradiganlar yo'q")
-            return
-        
-        unfollow_count = 0
-        follower_count = 0
-        checked_count = 0
-        limit = 80  # Bir siklda max
-        
-        for user in waiting_users:
-            username = user['username']
-            checked_count += 1
+        try:
+            # 1. O'z User ID ni olish
+            my_user_id = self._get_my_user_id()
+            if not my_user_id:
+                logger.error("❌ User ID olinmadi!")
+                return
             
-            # Sikl tekshiruvi
-            if database.get_config("current_cycle", "auto") != 'cleanup':
-                logger.info("⚡ Cleanup to'xtatildi (yangi buyruq)")
-                break
+            logger.info(f"✅ Mening User ID: {my_user_id}")
             
-            if unfollow_count >= limit:
-                logger.info("🛑 Unfollow limitga yetildi.")
-                break
+            # 2. Real-time FOLLOWERS olish (kim meni follow qiladi)
+            logger.info("📥 Real-time followerlar olinmoqda...")
+            my_followers = set(self._fetch_followers_api(my_user_id, max_count=2000))
+            logger.info(f"✅ {len(my_followers)} ta follower topildi")
             
-            try:
-                logger.info(f"🔍 [{checked_count}/{len(waiting_users)}] Tekshirilmoqda: @{username}")
+            # 3. Real-time FOLLOWING olish (men kimlarni follow qilaman)
+            logger.info("📥 Real-time following olinmoqda...")
+            my_following = self._fetch_following_api(my_user_id, max_count=2000)
+            logger.info(f"✅ {len(my_following)} ta following topildi")
+            
+            # 4. Solishtirish - kim follow qaytarmagan?
+            non_followers = [u for u in my_following if u not in my_followers]
+            logger.info(f"❌ Follow qaytarmaganlar: {len(non_followers)} ta")
+            
+            if not non_followers:
+                logger.info("✅ Barcha following sizni follow qiladi. Cleanup kerak emas!")
+                return
+            
+            # 5. Unfollow qilish
+            unfollow_count = 0
+            limit = 80
+            
+            for i, username in enumerate(non_followers):
+                if database.get_config("current_cycle", "auto") != 'cleanup':
+                    logger.info("⚡ Cleanup to'xtatildi (yangi buyruq)")
+                    break
                 
-                # Profilga o'tish
+                if unfollow_count >= limit:
+                    logger.info("🛑 Unfollow limitga yetildi.")
+                    break
+                
                 try:
-                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=30000)
-                except:
-                    logger.warning(f"⚠️ Profil yuklanmadi: @{username}")
-                    continue
-                
-                time.sleep(random.uniform(2, 4))
-                
-                # "Follows you" bormi?
-                is_following_me = False
-                try:
-                    follows_you = self.page.locator('text="Follows you"').first
-                    is_following_me = follows_you.is_visible()
-                except:
-                    pass
-                
-                if is_following_me:
-                    logger.info(f"✅ @{username} sizni follow qiladi. STATUS: followed_back")
-                    database.update_status(username, 'followed_back')
-                    follower_count += 1
-                    continue
-                
-                # "Follows you" yo'q - demak unfollow
-                logger.info(f"❌ @{username} follow qaytarmagan. UNFOLLOW...")
-                
-                # Following tugmasini topish
-                following_btn = self.page.locator('button:has-text("Following")').first
-                if not following_btn.is_visible():
-                    following_btn = self.page.locator('button:has-text("Requested")').first
-                
-                if following_btn.is_visible():
-                    following_btn.click()
-                    time.sleep(1)
+                    logger.info(f"❌ [{i+1}/{len(non_followers)}] Unfollow: @{username}")
                     
-                    # Confirm popup
-                    unfollow_confirm = self.page.locator('button:has-text("Unfollow")').first
-                    if unfollow_confirm.is_visible():
-                        unfollow_confirm.click()
-                        time.sleep(2)
+                    # Profilga o'tish
+                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=30000)
+                    time.sleep(random.uniform(2, 4))
+                    
+                    # Following tugmasini topish
+                    following_btn = self.page.locator('button:has-text("Following")').first
+                    if not following_btn.is_visible():
+                        following_btn = self.page.locator('button:has-text("Requested")').first
+                    
+                    if following_btn.is_visible():
+                        following_btn.click()
+                        time.sleep(1)
                         
-                        logger.info(f"✅ Unfollowed: @{username}")
-                        database.update_status(username, 'unfollowed')
-                        unfollow_count += 1
-                        
-                        # Backup
-                        if unfollow_count % 5 == 0:
-                            try:
-                                import backup
-                                backup.backup_cookies_to_gist(self.context.cookies())
-                            except:
-                                pass
-                        
-                        # Delay
-                        time.sleep(random.uniform(5, 10))
+                        unfollow_confirm = self.page.locator('button:has-text("Unfollow")').first
+                        if unfollow_confirm.is_visible():
+                            unfollow_confirm.click()
+                            time.sleep(2)
+                            
+                            logger.info(f"✅ Unfollowed: @{username}")
+                            database.update_status(username, 'unfollowed')
+                            unfollow_count += 1
+                            
+                            if unfollow_count % 5 == 0:
+                                try:
+                                    import backup
+                                    backup.backup_cookies_to_gist(self.context.cookies())
+                                except:
+                                    pass
+                            
+                            time.sleep(random.uniform(5, 10))
                     else:
-                        logger.warning("⚠️ Unfollow tasdiqlash oynasi chiqmadi")
-                else:
-                    logger.warning(f"⚠️ Following tugmasi topilmadi: @{username}")
+                        logger.warning(f"⚠️ Following tugmasi topilmadi: @{username}")
+                
+                except Exception as e:
+                    logger.error(f"❌ Xato @{username}: {e}")
             
-            except Exception as e:
-                logger.error(f"❌ Xato @{username}: {e}")
+            logger.info(f"\n{'='*50}")
+            logger.info(f"🧹 CLEANUP TUGADI")
+            logger.info(f"📊 Followerlar: {len(my_followers)} ta")
+            logger.info(f"📊 Following: {len(my_following)} ta")
+            logger.info(f"❌ Non-followers: {len(non_followers)} ta")
+            logger.info(f"✅ Unfollowed: {unfollow_count} ta")
+            logger.info(f"{'='*50}")
+            
+        except Exception as e:
+            logger.error(f"❌ Cleanup xatosi: {e}")
+    
+    def _fetch_following_api(self, user_id: str, max_count: int = 1000) -> list:
+        """Instagram GraphQL API orqali FOLLOWING olish (men kimlarni follow qilaman)"""
+        following = []
+        end_cursor = ""
+        page_count = 0
         
-        logger.info(f"\n{'='*40}")
-        logger.info(f"🧹 CLEANUP TUGADI")
-        logger.info(f"📊 Tekshirildi: {checked_count} ta")
-        logger.info(f"✅ Followerlar: {follower_count} ta")
-        logger.info(f"❌ Unfollowed: {unfollow_count} ta")
-        logger.info(f"{'='*40}")
+        try:
+            while len(following) < max_count and page_count < 50:
+                import urllib.parse
+                import json
+                
+                variables = {"id": user_id, "first": 50}
+                if end_cursor:
+                    variables["after"] = end_cursor
+                
+                # FOLLOWING uchun boshqa query hash
+                query_hash = "d04b0a864b4b54837c0d870b0e77e076"  # edge_follow query
+                url = f"https://www.instagram.com/graphql/query/?query_hash={query_hash}&variables={urllib.parse.quote(json.dumps(variables))}"
+                
+                result = self.page.evaluate(f"""async () => {{
+                    try {{
+                        const resp = await fetch("{url}", {{
+                            headers: {{ "x-requested-with": "XMLHttpRequest" }},
+                            credentials: "include"
+                        }});
+                        return await resp.json();
+                    }} catch(e) {{
+                        return null;
+                    }}
+                }}""")
+                
+                if not result or 'data' not in result:
+                    logger.warning("⚠️ Following API javob yo'q")
+                    break
+                
+                edges = result.get('data', {}).get('user', {}).get('edge_follow', {}).get('edges', [])
+                
+                if not edges:
+                    break
+                
+                for edge in edges:
+                    username = edge.get('node', {}).get('username')
+                    if username:
+                        following.append(username)
+                
+                page_info = result.get('data', {}).get('user', {}).get('edge_follow', {}).get('page_info', {})
+                has_next = page_info.get('has_next_page', False)
+                end_cursor = page_info.get('end_cursor', '')
+                
+                page_count += 1
+                logger.info(f"📊 Following API: {len(following)} ta ({page_count} sahifa)")
+                
+                if not has_next:
+                    break
+                
+                time.sleep(1)
+            
+            return following
+            
+        except Exception as e:
+            logger.error(f"❌ Following API xatosi: {e}")
+            return []
     
     def smart_sleep(self, seconds: int) -> bool:
         """Kutish davomida buyruqlarni tekshirish. Agar buyruq o'zgarsa True qaytaradi."""

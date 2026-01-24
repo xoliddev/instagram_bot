@@ -223,18 +223,27 @@ def get_today_stats():
         return 0, 0
 
 def get_total_stats():
-    """Umumiy statistika"""
+    """Umumiy statistika (faqat bot ishini ko'rsatadi)"""
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
+            # Jami bazadagi userlar
             cursor.execute("SELECT COUNT(*) as total FROM users")
             total = cursor.fetchone()['total']
             
-            cursor.execute("SELECT COUNT(*) as backed FROM users WHERE status = 'followed_back'")
-            backed = cursor.fetchone()['backed']
-            
+            # Kutilmoqda (follow qilingan, javob kutilmoqda)
             cursor.execute("SELECT COUNT(*) as waiting FROM users WHERE status = 'waiting'")
             waiting = cursor.fetchone()['waiting']
+            
+            # MUHIM: Faqat BIZ follow qilgan va QAYTARGANLAR
+            # Bu userlar avval 'pending' yoki 'waiting' edi, keyin 'followed_back' bo'ldi
+            # Organik followerlar bu erga kirmaydi
+            cursor.execute("""
+                SELECT COUNT(*) as backed FROM users 
+                WHERE status = 'followed_back' 
+                AND followed_at IS NOT NULL
+            """)
+            backed = cursor.fetchone()['backed']
             
             return total, waiting, backed
     except Exception as e:
