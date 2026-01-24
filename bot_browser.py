@@ -1695,10 +1695,28 @@ class InstagramBrowserBot:
             followers = self._fetch_followers_api(user_id)
             
             if followers:
-                logger.info(f"📥 API dan {len(followers)} ta follower olindi")
-                for username in followers:
+                followers_set = set(followers)
+                logger.info(f"📥 API dan {len(followers_set)} ta follower olindi")
+                
+                # 3. Yangi followerlarni bazaga qo'shish
+                for username in followers_set:
                     database.register_follower(username)
-                logger.info(f"✅ SYNC TUGADI: Jami {len(followers)} ta follower bazaga muhrlandi.")
+                
+                # 4. MUHIM: Eski followerlarni tozalash
+                # Bazadagi followed_back larni olish
+                old_followers = database.get_followers_from_db()
+                lost_count = 0
+                
+                for old_user in old_followers:
+                    if old_user not in followers_set:
+                        # Bu user endi follower emas - statusni o'zgartirish
+                        database.update_status(old_user, 'lost_follower')
+                        lost_count += 1
+                
+                if lost_count > 0:
+                    logger.info(f"🔄 {lost_count} ta eski follower 'lost_follower' ga o'zgartirildi")
+                
+                logger.info(f"✅ SYNC TUGADI: Jami {len(followers_set)} ta haqiqiy follower bazada.")
             else:
                 logger.warning("⚠️ API dan follower olinmadi, UI fallback...")
                 self._sync_followers_ui_fallback()
