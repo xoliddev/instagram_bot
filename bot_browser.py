@@ -1580,108 +1580,200 @@ class InstagramBrowserBot:
         print(f"{Fore.CYAN}{'='*50}\n")
     
     def sync_my_followers(self):
-        """Startup: Barcha followerlarni bazaga muhrlash (Sync)"""
+        """Startup: Barcha followerlarni bazaga muhrlash (GraphQL API orqali)"""
         logger.info(f"\n{'='*50}")
-        logger.info("🔄 STARTUP SYNC: Barcha followerlar bazaga saqlanmoqda...")
+        logger.info("🔄 STARTUP SYNC: GraphQL API orqali followerlar olinmoqda...")
         logger.info(f"{'='*50}\n")
         
         try:
-            # 1. O'z profilga o'tish
+            # 1. User ID olish
+            user_id = self._get_my_user_id()
+            if not user_id:
+                logger.warning("⚠️ User ID olinmadi, UI scroll ga o'tilmoqda...")
+                self._sync_followers_ui_fallback()
+                return
+            
+            logger.info(f"✅ User ID: {user_id}")
+            
+            # 2. GraphQL API orqali followers olish
+            followers = self._fetch_followers_api(user_id)
+            
+            if followers:
+                logger.info(f"📥 API dan {len(followers)} ta follower olindi")
+                for username in followers:
+                    database.register_follower(username)
+                logger.info(f"✅ SYNC TUGADI: Jami {len(followers)} ta follower bazaga muhrlandi.")
+            else:
+                logger.warning("⚠️ API dan follower olinmadi, UI fallback...")
+                self._sync_followers_ui_fallback()
+                
+        except Exception as e:
+            logger.error(f"❌ Sync xatosi: {e}")
+            self._sync_followers_ui_fallback()
+    
+    def _get_my_user_id(self):
+        """O'z user ID ni olish"""
+        try:
+            self.page.goto(f"https://www.instagram.com/{config.INSTAGRAM_USERNAME}/", wait_until="domcontentloaded", timeout=30000)
+            time.sleep(3)
+            
+            # HTML source dan user_id ni ajratib olish
+            user_id = self.page.evaluate("""() => {
+                const html = document.documentElement.innerHTML;
+                
+                // Usul 1: profilePage_XXXXX
+                let match = html.match(/"profilePage_([0-9]+)"/);
+                if (match) return match[1];
+                
+                // Usul 2: user_id":"XXXXX
+                match = html.match(/"user_id":"([0-9]+)"/);
+                if (match) return match[1];
+                
+                // Usul 3: logging_page_id dari
+                match = html.match(/"logging_page_id":"profilePage_([0-9]+)"/);
+                if (match) return match[1];
+                
+                return null;
+            }""")
+            
+            return user_id
+        except Exception as e:
+            logger.error(f"❌ User ID olishda xato: {e}")
+            return None
+    
+    def _fetch_followers_api(self, user_id, max_count=1000):
+        """Instagram GraphQL API orqali followers olish"""
+        followers = []
+        end_cursor = ""
+        page_count = 0
+        
+        try:
+            while len(followers) < max_count and page_count < 50:
+                # GraphQL query yasash
+                import urllib.parse
+                import json
+                
+                variables = {"id": user_id, "first": 50}
+                if end_cursor:
+                    variables["after"] = end_cursor
+                
+                # Query hash - Instagram followers uchun
+                query_hash = "c76146de99bb02f6415203be841dd25a"
+                url = f"https://www.instagram.com/graphql/query/?query_hash={query_hash}&variables={urllib.parse.quote(json.dumps(variables))}"
+                
+                # Fetch qilish (browser context orqali - cookies avtomatik)
+                result = self.page.evaluate(f"""async () => {{
+                    try {{
+                        const resp = await fetch("{url}", {{
+                            headers: {{
+                                "x-requested-with": "XMLHttpRequest"
+                            }},
+                            credentials: "include"
+                        }});
+                        return await resp.json();
+                    }} catch(e) {{
+                        return null;
+                    }}
+                }}""")
+                
+                if not result or 'data' not in result:
+                    logger.warning(f"⚠️ GraphQL javob yo'q yoki xato")
+                    break
+                
+                edges = result.get('data', {}).get('user', {}).get('edge_followed_by', {}).get('edges', [])
+                
+                if not edges:
+                    logger.info("📭 Boshqa follower yo'q")
+                    break
+                
+                for edge in edges:
+                    username = edge.get('node', {}).get('username')
+                    if username:
+                        followers.append(username)
+                
+                # Keyingi sahifa
+                page_info = result.get('data', {}).get('user', {}).get('edge_followed_by', {}).get('page_info', {})
+                has_next = page_info.get('has_next_page', False)
+                end_cursor = page_info.get('end_cursor', '')
+                
+                page_count += 1
+                logger.info(f"📊 API Progress: {len(followers)} ta follower ({page_count} sahifa)")
+                
+                if not has_next:
+                    break
+                    
+                time.sleep(1)  # Rate limit
+            
+            return followers
+            
+        except Exception as e:
+            logger.error(f"❌ GraphQL API xatosi: {e}")
+            return []
+    
+    def _sync_followers_ui_fallback(self):
+        """UI Scroll fallback (API ishlamasa)"""
+        logger.info("🔄 UI Scroll fallback ishga tushdi...")
+        
+        try:
             self.page.goto(f"https://www.instagram.com/{config.INSTAGRAM_USERNAME}/", wait_until="domcontentloaded", timeout=60000)
             time.sleep(3)
             
-            # 2. Followers tugmasini bosish
             followers_link = self.page.locator('a[href$="/followers/"]').first
             followers_link.click()
             time.sleep(5)
             
-            followers_count = 0
+            collected = set()
             scroll_count = 0
-            prev_count = 0
-            retry_attempts = 0
+            retry = 0
             
-            collected_usernames = set()
-            IGNORE_LIST = {'explore', 'reels', 'stories', 'direct', 'accounts', config.INSTAGRAM_USERNAME, 'create', 'guide'}
+            IGNORE = {'explore', 'reels', 'stories', 'direct', 'accounts', config.INSTAGRAM_USERNAME, 'create', 'guide'}
             
-            MAX_SCROLLS = 100 # Katta limit (barchasini olish uchun)
-            
-            while scroll_count < MAX_SCROLLS:
-                follower_links = self.page.locator('div[role="dialog"] a[href^="/"]')
-                count = follower_links.count()
+            while scroll_count < 100 and retry < 5:
+                links = self.page.locator('div[role="dialog"] a[href^="/"]')
+                count = links.count()
+                prev_len = len(collected)
                 
                 for i in range(count):
                     try:
-                        href = follower_links.nth(i).get_attribute("href")
+                        href = links.nth(i).get_attribute("href")
                         if href and href.startswith("/"):
-                            username = href.strip("/").split("/")[0]
-                            
-                            # Filter
-                            if not username or len(username) < 2: continue
-                            if username in IGNORE_LIST: continue
-                            if username in collected_usernames: continue
-                            
-                            collected_usernames.add(username)
-                            
-                            # CRITICAL: Har birini bazaga yozamiz
-                            database.register_follower(username)
+                            u = href.strip("/").split("/")[0]
+                            if u and len(u) >= 2 and u not in IGNORE and u not in collected:
+                                collected.add(u)
+                                database.register_follower(u)
                     except:
                         pass
                 
-                followers_count = len(collected_usernames)
+                if len(collected) == prev_len:
+                    retry += 1
+                    time.sleep(3)
+                else:
+                    retry = 0
                 
-                # Scroll (Javascript - Collect followers dagi kabi)
-                try:
-                    self.page.evaluate("""() => {
-                        const dialog = document.querySelector('div[role="dialog"]');
-                        if (dialog) {
-                            const divs = dialog.querySelectorAll('div');
-                            for (const div of divs) {
-                                if (div.scrollHeight > div.clientHeight) {
-                                    div.scrollTop += 800;
-                                    break;
-                                }
+                # Scroll
+                self.page.evaluate("""() => {
+                    const dialog = document.querySelector('div[role="dialog"]');
+                    if (dialog) {
+                        const divs = dialog.querySelectorAll('div');
+                        for (const div of divs) {
+                            if (div.scrollHeight > div.clientHeight) {
+                                div.scrollTop += 800;
+                                break;
                             }
                         }
-                    }""")
-                    time.sleep(2) 
-                except:
-                    pass
-                
+                    }
+                }""")
+                time.sleep(2)
                 scroll_count += 1
                 
-                # Agar o'zgarish bo'lmasa - Retry (Faqat unique count o'zgarmasa)
-                if followers_count == prev_count:
-                    retry_attempts += 1
-                    logger.info(f"⏳ Yuklanmoqda... ({retry_attempts}/3)")
-                    time.sleep(4) 
-                    
-                    # Yana bir scroll qilib ko'rish
-                    try:
-                        self.page.evaluate("""() => {
-                             const dialog = document.querySelector('div[role="dialog"]');
-                             if (dialog) dialog.scrollTop += 500;
-                        }""")
-                    except: 
-                        pass
-                        
-                    if retry_attempts >= 3:
-                        logging.info("✅ Ro'yxat oxiriga yetildi (yoki yuklanmayapti).")
-                        break
-                else:
-                    retry_attempts = 0 
-                
-                prev_count = followers_count
-                
                 if scroll_count % 5 == 0:
-                    logger.info(f"📊 Sync Progress: {followers_count} ta follower topildi...")
+                    logger.info(f"📊 UI Progress: {len(collected)} ta topildi...")
             
-            logger.info(f"✅ SYNC TUGADI: Jami {followers_count} ta follower bazaga muhrlandi.")
-            # Dialogni yopish
             self.page.keyboard.press("Escape")
-            time.sleep(1)
+            logger.info(f"✅ UI Fallback: {len(collected)} ta follower topildi")
             
         except Exception as e:
-            logger.error(f"❌ Sync xatosi: {e}")
+            logger.error(f"❌ UI Fallback xatosi: {e}")
 
     def close(self):
         """Brauzerni yopish"""
