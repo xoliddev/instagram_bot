@@ -347,6 +347,21 @@ def get_waiting_users_for_unfollow(limit=20):
         logger.error(f"❌ DB Get waiting users error: {e}")
         return []
 
+def get_all_waiting_users():
+    """Barcha tekshirilishi kerak bo'lgan userlar (waiting + followed_back)"""
+    try:
+        with closing(get_connection()) as conn:
+            cursor = conn.execute("""
+                SELECT username, followed_at, status
+                FROM users 
+                WHERE status IN ('waiting', 'followed_back')
+                ORDER BY followed_at ASC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"❌ DB Get all waiting users error: {e}")
+        return []
+
 # ============ TARGET MANAGEMENT ============
 
 def add_target(username: str) -> bool:

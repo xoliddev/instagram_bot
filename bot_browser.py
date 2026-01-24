@@ -175,13 +175,13 @@ class InstagramBrowserBot:
     
     def collect_followers(self, target: str, max_count: int = 1000) -> dict:
         """
-        Target followerlarini bazaga to'plash (pending status bilan)
+        Target followerlarini bazaga to'plash (GraphQL API orqali)
         Max 10,000 ta
         """
-        max_count = min(max_count, 10000)  # Maximum 10k
+        max_count = min(max_count, 10000)
         
         logger.info(f"\n{'='*50}")
-        logger.info(f"📥 FOLLOWER TO'PLASH BOSHLANDI: @{target}")
+        logger.info(f"📥 FOLLOWER TO'PLASH: @{target} (GraphQL API)")
         logger.info(f"🎯 Maqsad: {max_count} ta follower")
         logger.info(f"{'='*50}\n")
         
@@ -194,123 +194,158 @@ class InstagramBrowserBot:
         }
         
         try:
-            # Target profilga o'tish
-            self.page.goto(f"https://www.instagram.com/{target}/", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(5)  # Server sekin - ko'proq kutish
+            # 1. Target user ID olish
+            target_user_id = self._get_target_user_id(target)
             
-            # Followers tugmasini bosish
-            followers_btn = self.page.locator('a[href$="/followers/"]').first
-            followers_btn.click()
-            time.sleep(5)  # Server sekin - ko'proq kutish
+            if not target_user_id:
+                logger.warning("⚠️ Target User ID olinmadi, UI scroll ga o'tilmoqda...")
+                return self._collect_followers_ui_fallback(target, max_count)
             
-            # Dialog ochilganini kutish
-            dialog = self.page.locator('div[role="dialog"]').first
-            dialog.wait_for(timeout=30000)  # 30 sek timeout
-            time.sleep(5)  # Content yuklanishi uchun ko'proq vaqt
+            logger.info(f"✅ Target User ID: {target_user_id}")
             
-            # PageDown bilan dastlabki scroll (content yuklash uchun)
-            for _ in range(3):
-                self.page.keyboard.press("PageDown")
-                time.sleep(0.5)
-            time.sleep(3)
+            # 2. GraphQL API orqali followers olish
+            followers = self._fetch_followers_api(target_user_id, max_count)
             
-            collected = set()
-            scroll_count = 0
-            MAX_SCROLLS = 500  # Ko'p scroll (10k uchun)
-            no_new_count = 0  # Yangi user topilmasa sanash
-            
-            while len(collected) < max_count and scroll_count < MAX_SCROLLS:
-                # Linklar olish
-                follower_links = dialog.locator('a')
-                link_count = follower_links.count()
+            if followers:
+                logger.info(f"📥 API dan {len(followers)} ta follower olindi")
                 
-                new_in_scroll = 0
+                for username in followers:
+                    if database.add_pending_user(username):
+                        result["new_added"] += 1
+                    else:
+                        result["already_in_db"] += 1
+                    result["total_found"] += 1
                 
-                for i in range(link_count):
-                    if len(collected) >= max_count:
-                        break
-                    try:
-                        href = follower_links.nth(i).get_attribute("href")
-                        if not href or not href.startswith("/"):
-                            continue
-                        
-                        username = href.strip("/").split("/")[0]
-                        
-                        # Validatsiya
-                        if not username or len(username) < 2:
-                            continue
-                        if username in [target, 'explore', 'reels', 'stories', 'direct', 'accounts', config.INSTAGRAM_USERNAME]:
-                            continue
-                        
-                        if username not in collected:
-                            collected.add(username)
-                            result["total_found"] += 1
-                            
-                            # Bazaga saqlash
-                            if database.add_pending_user(username):
-                                result["new_added"] += 1
-                                new_in_scroll += 1
-                            else:
-                                result["already_in_db"] += 1
-                    except:
-                        continue
+                logger.info(f"\n{'='*50}")
+                logger.info(f"✅ TO'PLASH TUGADI!")
+                logger.info(f"📊 Jami topildi: {result['total_found']}")
+                logger.info(f"✅ Yangi qo'shildi: {result['new_added']}")
+                logger.info(f"♻️ Bazada bor edi: {result['already_in_db']}")
+                logger.info(f"{'='*50}\n")
                 
-                # Progress log
-                if scroll_count % 10 == 0:
-                    logger.info(f"📊 Progress: {len(collected)}/{max_count} topildi, {result['new_added']} yangi qo'shildi")
-                
-                # Yangi user topilmadimi?
-                if new_in_scroll == 0:
-                    no_new_count += 1
-                    if no_new_count >= 10:  # 10 scroll yangi user bo'lmasa to'xtash
-                        logger.info("⚠️ 10 scrollda yangi user topilmadi, to'xtatilmoqda...")
-                        break
-                else:
-                    no_new_count = 0
-                
-                # Scroll
                 try:
-                    self.page.evaluate("""() => {
-                        const dialog = document.querySelector('div[role="dialog"]');
-                        if (dialog) {
-                            const divs = dialog.querySelectorAll('div');
-                            for (const div of divs) {
-                                if (div.scrollHeight > div.clientHeight) {
-                                    div.scrollTop += 800;
-                                    break;
-                                }
-                            }
-                        }
-                    }""")
-                    time.sleep(1)
+                    import backup
+                    backup.backup_to_gist()
+                    logger.info("💾 Backup saqlandi")
                 except:
                     pass
                 
+                return result
+            else:
+                logger.warning("⚠️ API dan follower olinmadi, UI fallback...")
+                return self._collect_followers_ui_fallback(target, max_count)
+                
+        except Exception as e:
+            logger.error(f"❌ Collect xatosi: {e}")
+            result["errors"] += 1
+            return result
+    
+    def _get_target_user_id(self, target: str):
+        """Target username dan user ID olish"""
+        try:
+            self.page.goto(f"https://www.instagram.com/{target}/", wait_until="domcontentloaded", timeout=30000)
+            time.sleep(3)
+            
+            user_id = self.page.evaluate("""() => {
+                const html = document.documentElement.innerHTML;
+                
+                let match = html.match(/"profilePage_([0-9]+)"/);
+                if (match) return match[1];
+                
+                match = html.match(/"user_id":"([0-9]+)"/);
+                if (match) return match[1];
+                
+                match = html.match(/"logging_page_id":"profilePage_([0-9]+)"/);
+                if (match) return match[1];
+                
+                return null;
+            }""")
+            
+            return user_id
+        except Exception as e:
+            logger.error(f"❌ Target User ID olishda xato: {e}")
+            return None
+    
+    def _collect_followers_ui_fallback(self, target: str, max_count: int) -> dict:
+        """UI Scroll fallback (API ishlamasa)"""
+        logger.info("🔄 UI Scroll fallback ishga tushdi...")
+        
+        result = {"target": target, "total_found": 0, "new_added": 0, "already_in_db": 0, "errors": 0}
+        
+        try:
+            self.page.goto(f"https://www.instagram.com/{target}/", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(5)
+            
+            followers_btn = self.page.locator('a[href$="/followers/"]').first
+            followers_btn.click()
+            time.sleep(5)
+            
+            dialog = self.page.locator('div[role="dialog"]').first
+            dialog.wait_for(timeout=30000)
+            time.sleep(5)
+            
+            collected = set()
+            scroll_count = 0
+            no_new = 0
+            IGNORE = {'explore', 'reels', 'stories', 'direct', 'accounts', config.INSTAGRAM_USERNAME, 'create', 'guide', target}
+            
+            while len(collected) < max_count and scroll_count < 200 and no_new < 10:
+                links = dialog.locator('a')
+                count = links.count()
+                prev_len = len(collected)
+                
+                for i in range(count):
+                    if len(collected) >= max_count:
+                        break
+                    try:
+                        href = links.nth(i).get_attribute("href")
+                        if href and href.startswith("/"):
+                            u = href.strip("/").split("/")[0]
+                            if u and len(u) >= 2 and u not in IGNORE and u not in collected:
+                                collected.add(u)
+                                if database.add_pending_user(u):
+                                    result["new_added"] += 1
+                                else:
+                                    result["already_in_db"] += 1
+                                result["total_found"] += 1
+                    except:
+                        pass
+                
+                if len(collected) == prev_len:
+                    no_new += 1
+                else:
+                    no_new = 0
+                
+                self.page.evaluate("""() => {
+                    const dialog = document.querySelector('div[role="dialog"]');
+                    if (dialog) {
+                        for (const div of dialog.querySelectorAll('div')) {
+                            if (div.scrollHeight > div.clientHeight) {
+                                div.scrollTop += 800;
+                                break;
+                            }
+                        }
+                    }
+                }""")
+                time.sleep(1.5)
                 scroll_count += 1
+                
+                if scroll_count % 10 == 0:
+                    logger.info(f"📊 UI Progress: {len(collected)}/{max_count}")
             
-            # Dialogni yopish
             self.page.keyboard.press("Escape")
-            time.sleep(1)
+            logger.info(f"✅ UI Fallback: {result['total_found']} ta topildi")
             
-            logger.info(f"\n{'='*50}")
-            logger.info(f"✅ TO'PLASH TUGADI!")
-            logger.info(f"📊 Jami topildi: {result['total_found']}")
-            logger.info(f"✅ Yangi qo'shildi: {result['new_added']}")
-            logger.info(f"♻️ Bazada bor edi: {result['already_in_db']}")
-            logger.info(f"{'='*50}\n")
-            
-            # Backup
             try:
                 import backup
                 backup.backup_to_gist()
-                logger.info("💾 Backup saqlandi")
             except:
                 pass
             
             return result
             
         except Exception as e:
-            logger.error(f"❌ Collect xatosi: {e}")
+            logger.error(f"❌ UI Fallback xatosi: {e}")
             result["errors"] += 1
             return result
     
@@ -716,73 +751,71 @@ class InstagramBrowserBot:
 
     def smart_cleanup_interactive(self):
         """
-        SMART CLEANUP (AQLLI TOZALASH)
-        1. Followers va Following larni real vaqtda olish
-        2. Solishtirish
-        3. Profilga kirib 'Follows You' ni tekshirish
-        4. Unfollow
+        SMART CLEANUP - Bazadagi userlarni birma-bir tekshirish
+        Har bir profilga kirib "Follows you" borligini ko'radi
         """
         logger.info(f"\n{Fore.YELLOW}{'='*40}")
-        logger.info("🧹 SMART CLEANUP (AQLLI TOZALASH) BOSHLANDI")
+        logger.info("🧹 SMART CLEANUP BOSHLANDI")
         logger.info(f"{'='*40}{Style.RESET_ALL}")
         
-        # 1. Sync
-        my_followers = self.get_my_followers()
-        my_following = self.get_my_following()
+        # Bazadan waiting + followed_back userlarni olish
+        waiting_users = database.get_all_waiting_users()
+        logger.info(f"📊 Bazada {len(waiting_users)} ta tekshiriladigan user bor")
         
-        logger.info(f"📊 Natija: {len(my_followers)} followers, {len(my_following)} following")
+        if not waiting_users:
+            logger.info("✅ Tekshiradiganlar yo'q")
+            return
         
-        # 2. Solishtirish
-        non_followers = list(my_following - my_followers) # Farqi
-        logger.info(f"👥 Follow qaytarmaganlar (taxminiy): {len(non_followers)} ta")
-        random.shuffle(non_followers) # Turlicha bo'lishi uchun
+        unfollow_count = 0
+        follower_count = 0
+        checked_count = 0
+        limit = 80  # Bir siklda max
         
-        count = 0
-        limit = 40 # Bir siklda max unfollow
-        
-        for username in non_followers:
-            # Sikl tekshiruvi (agar user to'xtatsa)
+        for user in waiting_users:
+            username = user['username']
+            checked_count += 1
+            
+            # Sikl tekshiruvi
             if database.get_config("current_cycle", "auto") != 'cleanup':
                 logger.info("⚡ Cleanup to'xtatildi (yangi buyruq)")
                 break
-                
-            if count >= limit:
-                logger.info("🛑 Limitga yetildi. Cleanup tugadi.")
+            
+            if unfollow_count >= limit:
+                logger.info("🛑 Unfollow limitga yetildi.")
                 break
             
             try:
-                logger.info(f"🔍 Tekshirilmoqda: @{username}")
+                logger.info(f"🔍 [{checked_count}/{len(waiting_users)}] Tekshirilmoqda: @{username}")
                 
                 # Profilga o'tish
                 try:
-                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=60000)
+                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=30000)
                 except:
                     logger.warning(f"⚠️ Profil yuklanmadi: @{username}")
                     continue
-                    
+                
                 time.sleep(random.uniform(2, 4))
                 
-                # REAL CHECK: "Follows you" bormi?
+                # "Follows you" bormi?
                 is_following_me = False
-                
-                # Locatorlar
-                if self.page.locator('div:has-text("Follows you")').first.is_visible() or \
-                   self.page.locator('span:has-text("Follows you")').first.is_visible():
-                    is_following_me = True
+                try:
+                    follows_you = self.page.locator('text="Follows you"').first
+                    is_following_me = follows_you.is_visible()
+                except:
+                    pass
                 
                 if is_following_me:
-                    logger.info(f"✅ @{username} aslida sizni follow qilyapti (Ro'yxatda xatolik). SKIP.")
-                    # Bazaga updated qilib qo'yamiz
-                    database.register_follower(username)
+                    logger.info(f"✅ @{username} sizni follow qiladi. STATUS: followed_back")
+                    database.update_status(username, 'followed_back')
+                    follower_count += 1
                     continue
                 
-                # UNFOLLOW BOSHLASH
-                logger.info(f"❌ @{username} follow qaytarmagan. Unfollow qilinmoqda...")
+                # "Follows you" yo'q - demak unfollow
+                logger.info(f"❌ @{username} follow qaytarmagan. UNFOLLOW...")
                 
                 # Following tugmasini topish
                 following_btn = self.page.locator('button:has-text("Following")').first
                 if not following_btn.is_visible():
-                    # Requested bo'lishi mumkin
                     following_btn = self.page.locator('button:has-text("Requested")').first
                 
                 if following_btn.is_visible():
@@ -797,26 +830,32 @@ class InstagramBrowserBot:
                         
                         logger.info(f"✅ Unfollowed: @{username}")
                         database.update_status(username, 'unfollowed')
-                        count += 1
+                        unfollow_count += 1
                         
                         # Backup
-                        if count % 5 == 0:
-                             try:
+                        if unfollow_count % 5 == 0:
+                            try:
                                 import backup
                                 backup.backup_cookies_to_gist(self.context.cookies())
-                             except: pass
-
+                            except:
+                                pass
+                        
                         # Delay
-                        time.sleep(random.uniform(10, 20))
+                        time.sleep(random.uniform(5, 10))
                     else:
                         logger.warning("⚠️ Unfollow tasdiqlash oynasi chiqmadi")
                 else:
-                    logger.warning("⚠️ Following tugmasi topilmadi")
+                    logger.warning(f"⚠️ Following tugmasi topilmadi: @{username}")
             
             except Exception as e:
-                logger.error(f"❌ Smart cleanup xatosi @{username}: {e}")
-                
-        logger.info(f"🧹 Smart Cleanup tugadi. {count} ta user unfollow qilindi.")
+                logger.error(f"❌ Xato @{username}: {e}")
+        
+        logger.info(f"\n{'='*40}")
+        logger.info(f"🧹 CLEANUP TUGADI")
+        logger.info(f"📊 Tekshirildi: {checked_count} ta")
+        logger.info(f"✅ Followerlar: {follower_count} ta")
+        logger.info(f"❌ Unfollowed: {unfollow_count} ta")
+        logger.info(f"{'='*40}")
     
     def smart_sleep(self, seconds: int) -> bool:
         """Kutish davomida buyruqlarni tekshirish. Agar buyruq o'zgarsa True qaytaradi."""
