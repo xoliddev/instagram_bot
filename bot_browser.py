@@ -606,9 +606,11 @@ class InstagramBrowserBot:
                 if not follow_btn.is_visible():
                     # Balki allaqachon follow qilingandir? (Message yoki Requested)
                     if self.page.locator('div:has-text("Message")').first.is_visible() or \
-                       self.page.locator('button:has-text("Requested")').first.is_visible():
-                        logger.info(f"⏭️ @{username} allaqachon follow qilingan")
-                        database.add_user(username) # Bazaga 'waiting' bo'lib tushadi
+                       self.page.locator('button:has-text("Requested")').first.is_visible() or \
+                       self.page.locator('button:has-text("Following")').first.is_visible():
+                        logger.info(f"⏭️ @{username} allaqachon follow qilingan - statusni 'waiting' ga o'zgartiramiz")
+                        # Statusni yangilash (pending -> waiting)
+                        database.update_status(username, 'waiting')
                         return False
                     
                     # Balki sahifa chala yuklangandir?
