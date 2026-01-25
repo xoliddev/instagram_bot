@@ -54,6 +54,7 @@ class InstagramBrowserBot:
         self.browser = None
         self.context = None
         self.page = None
+        self.consecutive_timeouts = 0  # Timeout kuzatuvi
 
     def get_human_delay(self, min_sec: int, max_sec: int) -> int:
         """Insoniy vaqt oralig'i"""
@@ -575,23 +576,32 @@ class InstagramBrowserBot:
         max_retries = 2
         for attempt in range(max_retries):
             try:
+                # 5+ ketma-ket timeout bo'lsa, brauzerni yangilash
+                if self.consecutive_timeouts >= 5:
+                    logger.warning(f"⚠️ {self.consecutive_timeouts} ta ketma-ket timeout! Browser yangilanmoqda...")
+                    self.refresh_page_if_stuck()
+                    self.consecutive_timeouts = 0
+                    time.sleep(3)
+                
                 # Random delay (Anti-Spam) - kamaytirildi
-                time.sleep(random.uniform(1, 3))
+                time.sleep(random.uniform(1, 2))
                 
                 logger.info(f"🔍 Profilga kirilmoqda: @{username} (Urinish: {attempt+1}/{max_retries})")
                 
-                # Profilga o'tish (15s Timeout - commit = tezroq, hang bo'lmaydi)
+                # Profilga o'tish (12s Timeout - commit = tezroq)
                 try:
-                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=15000)
-                    # Qo'shimcha: DOM yuklanganliqini kutish (5s max)
+                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=12000)
+                    # Qo'shimcha: DOM yuklanganliqini kutish (3s max)
                     try:
-                        self.page.wait_for_load_state("domcontentloaded", timeout=5000)
+                        self.page.wait_for_load_state("domcontentloaded", timeout=3000)
                     except:
-                        pass  # Ignore - commit yetarli
+                        pass
+                    self.consecutive_timeouts = 0  # Muvaffaqiyatli - reset
                 except Exception as goto_err:
+                    self.consecutive_timeouts += 1
                     if attempt < max_retries - 1:
-                        logger.warning(f"⚠️ Timeout. 3s kutib qayta urinamiz...")
-                        time.sleep(3)
+                        logger.warning(f"⚠️ Timeout ({self.consecutive_timeouts}). 2s kutib qayta urinamiz...")
+                        time.sleep(2)
                         continue
                     else:
                         logger.error(f"❌ Profil yuklanmadi @{username}: Timeout")
