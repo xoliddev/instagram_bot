@@ -575,26 +575,31 @@ class InstagramBrowserBot:
         max_retries = 2
         for attempt in range(max_retries):
             try:
-                # Random delay (Anti-Spam)
-                time.sleep(random.uniform(2, 5))
+                # Random delay (Anti-Spam) - kamaytirildi
+                time.sleep(random.uniform(1, 3))
                 
                 logger.info(f"🔍 Profilga kirilmoqda: @{username} (Urinish: {attempt+1}/{max_retries})")
                 
-                # Profilga o'tish (20s Timeout - tezroq xato aniqlash)
+                # Profilga o'tish (15s Timeout - commit = tezroq, hang bo'lmaydi)
                 try:
-                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=20000)
+                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=15000)
+                    # Qo'shimcha: DOM yuklanganliqini kutish (5s max)
+                    try:
+                        self.page.wait_for_load_state("domcontentloaded", timeout=5000)
+                    except:
+                        pass  # Ignore - commit yetarli
                 except Exception as goto_err:
                     if attempt < max_retries - 1:
-                        logger.warning(f"⚠️ Timeout. 5s kutib qayta urinamiz...")
-                        time.sleep(5)
+                        logger.warning(f"⚠️ Timeout. 3s kutib qayta urinamiz...")
+                        time.sleep(3)
                         continue
                     else:
                         logger.error(f"❌ Profil yuklanmadi @{username}: Timeout")
                         return False
 
-                time.sleep(random.uniform(2, 4))
+                time.sleep(random.uniform(1, 2))
                 
-                # Follow tugmasini qidirish
+                # Follow tugmasini qidirish (5s timeout)
                 follow_btn = self.page.locator('button:has-text("Follow")').first
                 
                 # Agar Follow tugmasi bo'lmasa
@@ -1163,8 +1168,8 @@ class InstagramBrowserBot:
             logger.info(f"⏳ Profilga o'tilmoqda: @{username}")
             # 1. Profilga o'tish (Timeout 30s ga kamaytirildi)
             try:
-                self.page.goto(f"https://www.instagram.com/{username}/", timeout=30000)
-                time.sleep(3)
+                self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=15000)
+                time.sleep(2)
                 
                 # 1.5 TEZKOR TEKSHIRUV: Balki allaqachon unfollow qilingandir?
                 # Agar "Follow" tugmasi bo'lsa, API chaqirib o'tirmaymiz.
