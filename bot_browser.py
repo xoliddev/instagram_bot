@@ -61,6 +61,31 @@ class InstagramBrowserBot:
         std = (max_sec - min_sec) / 4
         delay = int(random.gauss(mean, std))
         return max(min_sec, min(max_sec, delay))
+    
+    def safe_goto(self, url: str, timeout: int = 20000, retries: int = 2) -> bool:
+        """Xavfsiz sahifaga o'tish - timeout va retry bilan"""
+        for attempt in range(retries):
+            try:
+                self.page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+                return True
+            except Exception as e:
+                if attempt < retries - 1:
+                    logger.warning(f"⚠️ Sahifa yuklanmadi ({attempt+1}/{retries}): {url[:50]}...")
+                    time.sleep(3)
+                else:
+                    logger.error(f"❌ Sahifa yuklanmadi: {url[:50]}... - {str(e)[:50]}")
+                    return False
+        return False
+    
+    def refresh_page_if_stuck(self) -> bool:
+        """Sahifa qotib qolsa yangilash"""
+        try:
+            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=15000)
+            time.sleep(2)
+            return True
+        except:
+            logger.warning("⚠️ Instagram asosiy sahifasi yuklanmadi")
+            return False
 
     def start_browser(self) -> bool:
         """Brauzerni ishga tushirish"""
@@ -555,17 +580,17 @@ class InstagramBrowserBot:
                 
                 logger.info(f"🔍 Profilga kirilmoqda: @{username} (Urinish: {attempt+1}/{max_retries})")
                 
-                # Profilga o'tish (60s Timeout)
+                # Profilga o'tish (20s Timeout - tezroq xato aniqlash)
                 try:
-                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=60000)
+                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="domcontentloaded", timeout=20000)
                 except Exception as goto_err:
                     if attempt < max_retries - 1:
-                        logger.warning(f"⚠️ Timeout. 10s kutib qayta urinamiz...")
-                        time.sleep(10)
+                        logger.warning(f"⚠️ Timeout. 5s kutib qayta urinamiz...")
+                        time.sleep(5)
                         continue
                     else:
                         logger.error(f"❌ Profil yuklanmadi @{username}: Timeout")
-                        return False # Bazaga qo'shmaymiz, keyinroq qayta urinamiz
+                        return False
 
                 time.sleep(random.uniform(2, 4))
                 
@@ -1445,11 +1470,13 @@ class InstagramBrowserBot:
                     
                     time.sleep(0.5) # URL yangilanishini kutish
 
-                # STUCK DETECTION: Agar bir xil user 20+ marta ko'rinsa, story qotib qolgan
+                # STUCK DETECTION: Agar bir xil user 5+ marta ko'rinsa, story qotib qolgan
                 if current_username == last_user:
                     same_user_count += 1
-                    if same_user_count >= 20:
-                        logger.warning(f"⚠️ Story qotib qoldi ({current_username} 20+ marta). Chiqilmoqda...")
+                    if same_user_count >= 5:
+                        logger.warning(f"⚠️ Story qotib qoldi ({current_username} 5+ marta). Chiqilmoqda...")
+                        # Sahifani yangilab, qotib qolishdan chiqish
+                        self.refresh_page_if_stuck()
                         break
                 else:
                     same_user_count = 0
