@@ -599,22 +599,33 @@ class InstagramBrowserBot:
 
                 time.sleep(random.uniform(1, 2))
                 
-                # Follow tugmasini qidirish (5s timeout)
-                follow_btn = self.page.locator('button:has-text("Follow")').first
+                # Follow tugmasini qidirish (5s timeout bilan)
+                try:
+                    follow_btn = self.page.locator('button:has-text("Follow")').first
+                    follow_btn.wait_for(state="visible", timeout=5000)
+                    follow_visible = True
+                except:
+                    follow_visible = False
                 
                 # Agar Follow tugmasi bo'lmasa
-                if not follow_btn.is_visible():
-                    # Balki allaqachon follow qilingandir? (Message yoki Requested)
-                    if self.page.locator('div:has-text("Message")').first.is_visible() or \
-                       self.page.locator('button:has-text("Requested")').first.is_visible() or \
-                       self.page.locator('button:has-text("Following")').first.is_visible():
+                if not follow_visible:
+                    # Allaqachon follow qilinganmi? (3s timeout bilan tekshiramiz)
+                    already_followed = False
+                    try:
+                        # Following, Requested, yoki Message bormi?
+                        combined_selector = 'button:has-text("Following"), button:has-text("Requested"), div:has-text("Message")'
+                        self.page.locator(combined_selector).first.wait_for(state="visible", timeout=3000)
+                        already_followed = True
+                    except:
+                        pass
+                    
+                    if already_followed:
                         logger.info(f"⏭️ @{username} allaqachon follow qilingan - statusni 'waiting' ga o'zgartiramiz")
-                        # Statusni yangilash (pending -> waiting)
                         database.update_status(username, 'waiting')
                         return False
                     
-                    # Balki sahifa chala yuklangandir?
-                    logger.warning(f"⚠️ @{username}: Follow tugmasi topilmadi (lekin profil mavjud). Skip.")
+                    # Sahifa chala yuklangan yoki profil topilmadi
+                    logger.warning(f"⚠️ @{username}: Follow tugmasi topilmadi. Skip.")
                     return False
                 
                 # Follow bosish
