@@ -1805,9 +1805,10 @@ class InstagramBrowserBot:
         followers = []
         end_cursor = ""
         page_count = 0
+        max_pages = 200  # Xavfsizlik limiti (200 * 50 = 10,000 follower)
         
         try:
-            while len(followers) < max_count and page_count < 50:
+            while len(followers) < max_count and page_count < max_pages:
                 # GraphQL query yasash
                 import urllib.parse
                 import json
