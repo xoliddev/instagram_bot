@@ -1635,9 +1635,28 @@ class InstagramBrowserBot:
                 except:
                     break
                     
-                # Agar storylar tugagan bo'lsa (Home sahifasiga qaytgan bo'lsa)
+                # Agar storylar tugagan bo'lsa - qayta boshlash (vaqt qolsa)
                 current_url = self.page.url
                 if "instagram.com/stories" not in current_url:
+                    remaining = duration - (time.time() - start_time)
+                    if remaining > 30:  # Kamida 30s qolsa qayta boshlaymiz
+                        logger.info(f"🔄 Storylar tugadi. Qayta boshlanmoqda... ({int(remaining)}s qoldi)")
+                        time.sleep(5)  # Biroz kutish
+                        # Home sahifaga o'tish
+                        try:
+                            self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=15000)
+                            time.sleep(3)
+                            # Yangi storylarni topish va boshlash
+                            story_rings = self.page.locator('canvas')
+                            ring_count = story_rings.count()
+                            if ring_count > 1:
+                                story_rings.nth(1).click()
+                                time.sleep(2)
+                                same_user_count = 0
+                                last_user = None
+                                continue  # Loop davom etadi
+                        except:
+                            pass
                     logger.info("✅ Barcha storylar ko'rildi.")
                     break
 
