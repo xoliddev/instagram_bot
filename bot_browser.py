@@ -1616,13 +1616,28 @@ class InstagramBrowserBot:
                 
                 # Keyingi storyga o'tish (Next tugmasi yoki Keyboard Right)
                 try:
+                    # 1. Keyboard Right (2 marta - ishonchli)
                     self.page.keyboard.press("ArrowRight")
-                    time.sleep(0.5)
+                    time.sleep(0.3)
+                    
+                    # 2. Agar o'tmasa - ekranning o'ng tomonini bosish
+                    try:
+                        # Viewport o'lchamlarini olish
+                        viewport = self.page.viewport_size
+                        if viewport:
+                            # O'ng tomon - markazdan o'ngda
+                            x = int(viewport['width'] * 0.85)
+                            y = int(viewport['height'] * 0.5)
+                            self.page.mouse.click(x, y)
+                            time.sleep(0.3)
+                    except:
+                        pass
                 except:
                     break
                     
                 # Agar storylar tugagan bo'lsa (Home sahifasiga qaytgan bo'lsa)
-                if self.page.url == "https://www.instagram.com/":
+                current_url = self.page.url
+                if "instagram.com/stories" not in current_url:
                     logger.info("✅ Barcha storylar ko'rildi.")
                     break
 
