@@ -1396,6 +1396,62 @@ class InstagramBrowserBot:
             
             return False
     
+    def _restart_story_viewing(self) -> bool:
+        """
+        Storylarni qayta boshlash uchun helper funksiya.
+        Home sahifaga o'tib, story ringlarni topib, boshlaydi.
+        
+        Returns:
+            True agar muvaffaqiyatli boshlangan bo'lsa, False aks holda
+        """
+        try:
+            # 1. Home sahifaga o'tish
+            self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=15000)
+            time.sleep(3)
+            
+            # 2. Story ringlarni topish (bir necha usul bilan)
+            # 2a. Canvas selector (eng ishonchli)
+            story_rings = self.page.locator('canvas')
+            ring_count = story_rings.count()
+            
+            if ring_count > 1:
+                logger.info(f"🔄 {ring_count} ta story (canvas) topildi. Qayta boshlanmoqda...")
+                story_rings.nth(1).click()  # 1-chi = "Add Story", 2-chi = do'st story
+                time.sleep(2)
+                return True
+            elif ring_count == 1:
+                story_rings.first.click()
+                time.sleep(2)
+                return True
+            
+            # 2b. Role=button div (fallback)
+            try:
+                import re
+                stories = self.page.locator('div[role="button"]').filter(has_text=re.compile(r"Story|Hikoya|История", re.IGNORECASE))
+                if stories.count() > 0:
+                    stories.first.click()
+                    time.sleep(2)
+                    return True
+            except:
+                pass
+            
+            # 2c. Section bilan (eng yangi Instagram UI)
+            try:
+                story_section = self.page.locator('section').first.locator('div[role="button"]').first
+                if story_section.is_visible():
+                    story_section.click()
+                    time.sleep(2)
+                    return True
+            except:
+                pass
+            
+            logger.warning("⚠️ Story topilmadi (qayta urinish)")
+            return False
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Story qayta boshlashda xato: {e}")
+            return False
+    
     def watch_stories_and_like(self, duration: int, wait_remaining: bool = True):
         """
         Storylarni tomosha qilish va like bosish (Human-Like Behavior)
@@ -1502,9 +1558,17 @@ class InstagramBrowserBot:
                 if current_username == last_user:
                     same_user_count += 1
                     if same_user_count >= 5:
-                        logger.warning(f"⚠️ Story qotib qoldi ({current_username} 5+ marta). Chiqilmoqda...")
-                        # Sahifani yangilab, qotib qolishdan chiqish
-                        self.refresh_page_if_stuck()
+                        remaining = duration - (time.time() - start_time)
+                        if remaining > 30:
+                            logger.warning(f"⚠️ Story qotib qoldi ({current_username} 5+ marta). Qayta boshlanmoqda...")
+                            self.refresh_page_if_stuck()
+                            time.sleep(2)
+                            # Qayta story ochish
+                            if self._restart_story_viewing():
+                                same_user_count = 0
+                                last_user = None
+                                continue  # Loop davom etadi
+                        logger.warning(f"⚠️ Story qotib qoldi. Chiqilmoqda...")
                         break
                 else:
                     same_user_count = 0
@@ -1641,50 +1705,84 @@ class InstagramBrowserBot:
                     remaining = duration - (time.time() - start_time)
                     if remaining > 30:  # Kamida 30s qolsa qayta boshlaymiz
                         logger.info(f"🔄 Storylar tugadi. Qayta boshlanmoqda... ({int(remaining)}s qoldi)")
-                        time.sleep(5)  # Biroz kutish
-                        # Home sahifaga o'tish
-                        try:
-                            self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=15000)
-                            time.sleep(3)
-                            # Yangi storylarni topish va boshlash
-                            story_rings = self.page.locator('canvas')
-                            ring_count = story_rings.count()
-                            if ring_count > 1:
-                                story_rings.nth(1).click()
-                                time.sleep(2)
-                                same_user_count = 0
-                                last_user = None
-                                continue  # Loop davom etadi
-                        except:
-                            pass
+                        time.sleep(3)
+                        if self._restart_story_viewing():
+                            same_user_count = 0
+                            last_user = None
+                            continue  # Loop davom etadi
                     logger.info("✅ Barcha storylar ko'rildi.")
                     break
 
         except Exception as e:
             logger.error(f"❌ Story ko'rishda xato: {e}")
             
-        # Agar vaqt ortib qolsa va wait_remaining=True bo'lsa - kutish
+        # Agar vaqt ortib qolsa - qayta story ko'rishni urinib ko'ramiz (wait_remaining=True bo'lsa)
         if not wait_remaining:
             logger.info("✅ Storylar tugadi. Darhol davom etilmoqda.")
             return
             
         remaining = duration - (time.time() - start_time)
-        # MAX 1 soat kutish (uzun hang ni oldini olish)
-        remaining = min(remaining, 3600)
+        restart_attempts = 0
+        max_restart_attempts = 10  # Maksimal qayta urinishlar
         
+        # Agar ko'p vaqt qolsa, qayta urinib ko'ramiz
+        while remaining > 60 and restart_attempts < max_restart_attempts:
+            logger.info(f"🔄 Vaqt qoldi ({int(remaining)}s). Story ko'rishni qayta boshlaymiz (urinish {restart_attempts + 1}/{max_restart_attempts})...")
+            restart_attempts += 1
+            time.sleep(5)
+            
+            # Buyruqni tekshirish
+            current_cycle_check = database.get_config("current_cycle", "auto")
+            if current_cycle_check != initial_cycle:
+                logger.info(f"⚡ Qayta boshlash to'xtatildi (Yangi buyruq: {current_cycle_check})")
+                return
+            
+            if self._restart_story_viewing():
+                # Qayta story ko'rishni boshlash
+                try:
+                    sub_start = time.time()
+                    same_user_count = 0
+                    last_user = None
+                    
+                    while (time.time() - sub_start) < remaining:
+                        try:
+                            # Vaqtni yangilash
+                            sub_remaining = remaining - (time.time() - sub_start)
+                            if sub_remaining <= 0:
+                                break
+                            
+                            watch_time = min(random.randint(3, 10), sub_remaining)
+                            
+                            # Hozirgi URLni tekshirish
+                            if "instagram.com/stories" not in self.page.url:
+                                logger.info("🔚 Storylar tugadi (sub-loop).")
+                                break
+                            
+                            # Keyingi storyga o'tish
+                            self.page.keyboard.press("ArrowRight")
+                            time.sleep(watch_time)
+                            
+                        except Exception as sub_err:
+                            logger.warning(f"⚠️ Sub-loop xato: {sub_err}")
+                            break
+                    
+                except Exception as restart_err:
+                    logger.warning(f"⚠️ Qayta ko'rish xatosi: {restart_err}")
+            
+            remaining = duration - (time.time() - start_time)
+        
+        # Qolgan vaqt juda kam bo'lsa (60s dan kam) - qisqa kutish
+        remaining = min(remaining, 60)  # MAX 60s kutish
         if remaining > 0:
             logger.info(f"⏳ Qolgan vaqt: {int(remaining)}s. (Buyruqlar kutilmoqda...)")
-            
             slept = 0
             while slept < remaining:
                 time.sleep(1)
                 slept += 1
-                
-                # Buyruqni tekshirish
                 current_cycle_check = database.get_config("current_cycle", "auto")
                 if current_cycle_check != initial_cycle:
-                     logger.info(f"⚡ Kutish to'xtatildi (Yangi buyruq: {current_cycle_check})")
-                     break
+                    logger.info(f"⚡ Kutish to'xtatildi (Yangi buyruq: {current_cycle_check})")
+                    break
             
     def send_telegram_msg(self, text: str):
         """Telegramga xabar yuborish (Requests orqali - Conflict bo'lmaydi)"""
