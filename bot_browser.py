@@ -1435,12 +1435,20 @@ class InstagramBrowserBot:
             if ring_count > 1:
                 logger.info(f"🔄 {ring_count} ta story (canvas) topildi. Qayta boshlanmoqda...")
                 story_rings.nth(1).click()  # 1-chi = "Add Story", 2-chi = do'st story
-                time.sleep(2)
-                return True
+                time.sleep(3)  # Story ochilishini kutish
+                # URL ni tekshirish - story ochilganmi?
+                if "instagram.com/stories" in self.page.url:
+                    logger.info("✅ Story ochildi!")
+                    return True
+                else:
+                    logger.warning("⚠️ Story ochilmadi, URL tekshiruvi muvaffaqiyatsiz")
+                    return False
             elif ring_count == 1:
                 story_rings.first.click()
-                time.sleep(2)
-                return True
+                time.sleep(3)
+                if "instagram.com/stories" in self.page.url:
+                    return True
+                return False
             
             # 2b. Role=button div (fallback)
             try:
@@ -1759,30 +1767,49 @@ class InstagramBrowserBot:
                 # Qayta story ko'rishni boshlash
                 try:
                     sub_start = time.time()
-                    same_user_count = 0
-                    last_user = None
+                    max_iterations = 100  # Xavfsizlik chegarasi
+                    iterations = 0
                     
-                    while (time.time() - sub_start) < remaining:
+                    while (time.time() - sub_start) < remaining and iterations < max_iterations:
+                        iterations += 1
                         try:
                             # Vaqtni yangilash
                             sub_remaining = remaining - (time.time() - sub_start)
                             if sub_remaining <= 0:
                                 break
                             
-                            watch_time = min(random.randint(3, 10), sub_remaining)
-                            
                             # Hozirgi URLni tekshirish
-                            if "instagram.com/stories" not in self.page.url:
+                            current_url = self.page.url
+                            if "instagram.com/stories" not in current_url:
                                 logger.info("🔚 Storylar tugadi (sub-loop).")
                                 break
                             
-                            # Keyingi storyga o'tish
-                            self.page.keyboard.press("ArrowRight")
+                            watch_time = min(random.randint(3, 8), sub_remaining)
+                            logger.info(f"👀 Story (sub): {watch_time}s kutilmoqda...")
                             time.sleep(watch_time)
+                            
+                            # Keyingi storyga o'tish (2 usul)
+                            # 1. ArrowRight
+                            self.page.keyboard.press("ArrowRight")
+                            time.sleep(0.5)
+                            
+                            # 2. Mouse click (fallback)
+                            try:
+                                viewport = self.page.viewport_size
+                                if viewport:
+                                    x = int(viewport['width'] * 0.85)
+                                    y = int(viewport['height'] * 0.5)
+                                    self.page.mouse.click(x, y)
+                                    time.sleep(0.3)
+                            except:
+                                pass
                             
                         except Exception as sub_err:
                             logger.warning(f"⚠️ Sub-loop xato: {sub_err}")
                             break
+                    
+                    if iterations >= max_iterations:
+                        logger.warning("⚠️ Sub-loop max iteratsiyaga yetdi.")
                     
                 except Exception as restart_err:
                     logger.warning(f"⚠️ Qayta ko'rish xatosi: {restart_err}")
