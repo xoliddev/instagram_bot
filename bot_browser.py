@@ -1396,6 +1396,24 @@ class InstagramBrowserBot:
             
             return False
     
+    def refresh_page_if_stuck(self):
+        """
+        Sahifani yangilash (qotib qolganda)
+        """
+        try:
+            logger.info("🔄 Sahifa yangilanmoqda...")
+            self.page.reload(wait_until="commit", timeout=15000)
+            time.sleep(3)
+            logger.info("✅ Sahifa yangilandi")
+        except Exception as e:
+            logger.warning(f"⚠️ Sahifa yangilashda xato: {e}")
+            # Fallback: home sahifaga o'tish
+            try:
+                self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=15000)
+                time.sleep(3)
+            except:
+                pass
+    
     def _restart_story_viewing(self) -> bool:
         """
         Storylarni qayta boshlash uchun helper funksiya.
