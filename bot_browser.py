@@ -597,14 +597,114 @@ class InstagramBrowserBot:
             logger.error(f"❌ Followers olishda xato: {e}")
             return []
     
+    def _get_user_id_via_api(self, username: str):
+        """Username orqali User ID olish (Navigatsiyasiz)"""
+        try:
+            user_id = self.page.evaluate(f"""async () => {{
+                try {{
+                    const resp = await fetch("https://www.instagram.com/api/v1/users/web_profile_info/?username={username}", {{
+                        headers: {{
+                            "X-IG-App-ID": "936619743392459",
+                            "X-Requested-With": "XMLHttpRequest"
+                        }}
+                    }});
+                    const json = await resp.json();
+                    return json.data.user.id;
+                }} catch (e) {{
+                    return null;
+                }}
+            }}""")
+            return user_id
+        except Exception as e:
+            return None
+
+    def _follow_via_api(self, user_id: str) -> bool:
+        """API orqali follow qilish (Tezkor)"""
+        try:
+            result = self.page.evaluate(f"""async () => {{
+                try {{
+                    // CSRF Token olish
+                    const getCookie = (name) => {{
+                        const value = `; ${{document.cookie}}`;
+                        const parts = value.split(`; ${{name}}=`);
+                        if (parts.length === 2) return parts.pop().split(';').shift();
+                    }}
+                    const csrftoken = getCookie('csrftoken');
+
+                    const resp = await fetch("https://www.instagram.com/api/v1/friendships/create/{user_id}/", {{
+                        method: "POST",
+                        headers: {{
+                            "X-IG-App-ID": "936619743392459",
+                            "X-Requested-With": "XMLHttpRequest",
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "X-CSRFToken": csrftoken
+                        }}
+                    }});
+                    const json = await resp.json();
+                    return json.status === "ok" || json.result === "following";
+                }} catch (e) {{
+                    return false;
+                }}
+            }}""")
+            return result
+        except:
+            return False
+
+    def _unfollow_via_api(self, user_id: str) -> bool:
+        """API orqali unfollow qilish (Tezkor)"""
+        try:
+            result = self.page.evaluate(f"""async () => {{
+                try {{
+                    const getCookie = (name) => {{
+                        const value = `; ${{document.cookie}}`;
+                        const parts = value.split(`; ${{name}}=`);
+                        if (parts.length === 2) return parts.pop().split(';').shift();
+                    }}
+                    const csrftoken = getCookie('csrftoken');
+
+                    const resp = await fetch("https://www.instagram.com/api/v1/friendships/destroy/{user_id}/", {{
+                        method: "POST",
+                        headers: {{
+                            "X-IG-App-ID": "936619743392459",
+                            "X-Requested-With": "XMLHttpRequest",
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "X-CSRFToken": csrftoken
+                        }}
+                    }});
+                    const json = await resp.json();
+                    return json.status === "ok";
+                }} catch (e) {{
+                    return false;
+                }}
+            }}""")
+            return result
+        except:
+            return False
+
     def follow_user(self, username: str) -> bool:
-        """Foydalanuvchini follow qilish (Retry va Timeout himoyasi bilan)"""
+        """Foydalanuvchini follow qilish (API + Retry va Timeout himoyasi bilan)"""
         
         # Limit tekshirish
         daily_follow, _ = database.get_today_stats()
         if daily_follow >= config.DAILY_FOLLOW_LIMIT:
             logger.warning(f"⚠️ Kunlik limit tugadi ({daily_follow})")
             return False
+            
+        # 1. API orqali urinib ko'rish (ENG TEZ - NAVIGATSIYASIZ)
+        try:
+            user_id = self._get_user_id_via_api(username)
+            if user_id:
+                if self._follow_via_api(user_id):
+                    logger.info(f"⚡ API orqali follow qilindi: @{username}")
+                    database.update_status(username, 'waiting')
+                    database.update_today_stats(follow=1)
+                    return True
+                else:
+                    logger.warning(f"⚠️ API follow o'xshamadi @{username}, browser fallback...")
+        except Exception as api_err:
+             logger.warning(f"⚠️ API Error: {api_err}")
+
+        # 2. BROWSER FALLBACK (Eski usul)
         
         # Bazada bormi?
         user = database.get_user(username)
@@ -1227,6 +1327,19 @@ class InstagramBrowserBot:
             logger.warning(f"⚠️ Kunlik unfollow limiti tugadi")
             return False
         
+        # 1. API orqali urinib ko'rish (ENG TEZ - NAVIGATSIYASIZ)
+        try:
+            user_id = self._get_user_id_via_api(username)
+            if user_id:
+                if self._unfollow_via_api(user_id):
+                    logger.info(f"⚡ API orqali unfollow qilindi: @{username}")
+                    database.update_status(username, 'unfollowed')
+                    return True
+                else:
+                    logger.warning(f"⚠️ API unfollow o'xshamadi @{username}, browser fallback...")
+        except Exception as api_err:
+             logger.warning(f"⚠️ API Error (Unfollow): {api_err}")
+
         try:
             logger.info(f"⏳ Profilga o'tilmoqda: @{username}")
             # 1. Profilga o'tish (Timeout 45s ga oshirildi)
