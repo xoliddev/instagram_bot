@@ -1641,9 +1641,26 @@ class InstagramBrowserBot:
                                 except:
                                     pass
                             
-                            # Agar ArrowRight ishlamasa - sahifani yangilash va qayta boshlash
+                            
+                            # Agar ArrowRight ishlamasa - Next tugmani (Right chevron) bosib ko'rish
                             if not skip_success:
-                                logger.info("🔄 ArrowRight ishlamadi. Sahifa yangilanmoqda...")
+                                try:
+                                    next_btns = self.page.locator('svg[aria-label="Next"], svg[aria-label="Right chevron"], svg[aria-label="Keyingisi"]')
+                                    if next_btns.count() > 0:
+                                        for i in range(next_btns.count()):
+                                            btn = next_btns.nth(i)
+                                            if btn.is_visible():
+                                                logger.info("🖱️ Next tugmasi (Right chevron) topildi, bosilmoqda...")
+                                                btn.locator("..").click(force=True)
+                                                time.sleep(1)
+                                                skip_success = True
+                                                break
+                                except:
+                                    pass
+
+                            # Agar hali ham o'tmasa - sahifani yangilash
+                            if not skip_success:
+                                logger.info("🔄 ArrowRight va Click ishlamadi. Sahifa yangilanmoqda...")
                                 self.refresh_page_if_stuck()
                                 time.sleep(2)
                                 # Qayta story ochish
