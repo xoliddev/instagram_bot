@@ -618,8 +618,8 @@ class InstagramBrowserBot:
         except Exception as e:
             return None
 
-    def _follow_via_api(self, user_id: str) -> bool:
-        """API orqali follow qilish (Tezkor)"""
+    def _follow_via_api(self, user_id: str) -> dict:
+        """API orqali follow qilish (Tezkor) - Return: {success: bool, error: str}"""
         try:
             result = self.page.evaluate(f"""async () => {{
                 try {{
@@ -641,17 +641,21 @@ class InstagramBrowserBot:
                         }}
                     }});
                     const json = await resp.json();
-                    return json.status === "ok" || json.result === "following";
+                    if (json.status === "ok" || json.result === "following") {{
+                        return {{ success: true }};
+                    }} else {{
+                        return {{ success: false, error: json.message || json.status || "Unknown error" }};
+                    }}
                 }} catch (e) {{
-                    return false;
+                    return {{ success: false, error: e.toString() }};
                 }}
             }}""")
             return result
-        except:
-            return False
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
-    def _unfollow_via_api(self, user_id: str) -> bool:
-        """API orqali unfollow qilish (Tezkor)"""
+    def _unfollow_via_api(self, user_id: str) -> dict:
+        """API orqali unfollow qilish (Tezkor) - Return: {success: bool, error: str}"""
         try:
             result = self.page.evaluate(f"""async () => {{
                 try {{
@@ -672,14 +676,18 @@ class InstagramBrowserBot:
                         }}
                     }});
                     const json = await resp.json();
-                    return json.status === "ok";
+                    if (json.status === "ok") {{
+                        return {{ success: true }};
+                    }} else {{
+                        return {{ success: false, error: json.message || "Unknown error" }};
+                    }}
                 }} catch (e) {{
-                    return false;
+                    return {{ success: false, error: e.toString() }};
                 }}
             }}""")
             return result
-        except:
-            return False
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def follow_user(self, username: str) -> bool:
         """Foydalanuvchini follow qilish (API + Retry va Timeout himoyasi bilan)"""
@@ -694,13 +702,14 @@ class InstagramBrowserBot:
         try:
             user_id = self._get_user_id_via_api(username)
             if user_id:
-                if self._follow_via_api(user_id):
+                api_res = self._follow_via_api(user_id)
+                if api_res.get('success'):
                     logger.info(f"⚡ API orqali follow qilindi: @{username}")
                     database.update_status(username, 'waiting')
                     database.update_today_stats(follow=1)
                     return True
                 else:
-                    logger.warning(f"⚠️ API follow o'xshamadi @{username}, browser fallback...")
+                    logger.warning(f"⚠️ API follow o'xshamadi @{username}: {api_res.get('error')}, browser fallback...")
         except Exception as api_err:
              logger.warning(f"⚠️ API Error: {api_err}")
 
@@ -1331,12 +1340,13 @@ class InstagramBrowserBot:
         try:
             user_id = self._get_user_id_via_api(username)
             if user_id:
-                if self._unfollow_via_api(user_id):
+                api_res = self._unfollow_via_api(user_id)
+                if api_res.get('success'):
                     logger.info(f"⚡ API orqali unfollow qilindi: @{username}")
                     database.update_status(username, 'unfollowed')
                     return True
                 else:
-                    logger.warning(f"⚠️ API unfollow o'xshamadi @{username}, browser fallback...")
+                    logger.warning(f"⚠️ API unfollow o'xshamadi @{username}: {api_res.get('error')}, browser fallback...")
         except Exception as api_err:
              logger.warning(f"⚠️ API Error (Unfollow): {api_err}")
 
