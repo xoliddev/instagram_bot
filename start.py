@@ -100,9 +100,30 @@ def main():
         nonlocal insta_thread
         while True:
             time.sleep(10)
+            
+            # 1. Thread o'lib qolganini tekshirish
             if not insta_thread.is_alive():
                 logger.warning("⚠️ Instagram Bot Thread to'xtab qoldi! Qayta ishga tushirilmoqda...")
                 insta_thread = start_insta_thread()
+                continue
+            
+            # 2. Heartbeat tekshirish (Bot qotib qolganini aniqlash)
+            try:
+                if os.path.exists("heartbeat.txt"):
+                    with open("heartbeat.txt", "r") as f:
+                        last_beat = float(f.read().strip())
+                    
+                    if time.time() - last_beat > 600: # 10 daqiqa (600s)
+                        logger.error(f"❌ Instagram Bot qotib qoldi (Heartbeat: {int(time.time() - last_beat)}s oldin). Qayta ishga tushirilmoqda...")
+                        # Eski threadni o'ldirishning iloji yo'q, shunchaki yangisini boshlaymiz
+                        # (Eski thread I/O da qotgan bo'lsa CPU yemaydi)
+                        insta_thread = start_insta_thread()
+                        
+                        # Heartbeatni yangilab qo'yamiz (darhol qayta restart qilmaslik uchun)
+                        with open("heartbeat.txt", "w") as f:
+                            f.write(str(time.time()))
+            except Exception as e:
+                logger.warning(f"⚠️ Heartbeat check error: {e}")
     
     monitor = threading.Thread(target=monitor_threads, daemon=True)
     monitor.start()

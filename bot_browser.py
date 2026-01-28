@@ -63,6 +63,14 @@ class InstagramBrowserBot:
         delay = int(random.gauss(mean, std))
         return max(min_sec, min(max_sec, delay))
     
+    def update_heartbeat(self):
+        """Bot tirikligini bildirish uchun timestamp yozish"""
+        try:
+            with open("heartbeat.txt", "w") as f:
+                f.write(str(time.time()))
+        except:
+            pass
+    
     def safe_goto(self, url: str, timeout: int = 20000, retries: int = 2) -> bool:
         """Xavfsiz sahifaga o'tish - timeout va retry bilan"""
         for attempt in range(retries):
@@ -1425,9 +1433,11 @@ class InstagramBrowserBot:
         Returns:
             True agar muvaffaqiyatli boshlangan bo'lsa, False aks holda
         """
+        logger.info("🔄 _restart_story_viewing funksiyasi chaqirildi...")
         try:
+            self.update_heartbeat()
             # 1. Home sahifaga o'tish
-            self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=15000)
+            self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=20000)
             time.sleep(3)
             
             # 2. Story ringlarni topish (bir necha usul bilan)
@@ -1563,6 +1573,9 @@ class InstagramBrowserBot:
             max_total_stuck_retries = 15  # Maksimal qayta urinishlar
             
             while (time.time() - start_time) < duration:
+                # Heartbeat yangilash (Bot tirik)
+                self.update_heartbeat()
+
                 # Qancha vaqt qoldi?
                 remaining = duration - (time.time() - start_time)
                 if remaining <= 0:
@@ -2300,6 +2313,7 @@ def main():
         
         try:
             while True:
+                bot.update_heartbeat()
                 try:
                     # 🔄 HAR SOATLIK SYNC: Yangi followerlarni tekshirish
                     hours_since_sync = (datetime.now() - last_sync_time).total_seconds() / 3600
