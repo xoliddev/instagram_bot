@@ -57,6 +57,14 @@ def init_db():
                 )
             """)
             
+            # Indekslarni qo'shish (Tezlik uchun)
+            try:
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_followed_at ON users(followed_at)")
+                logger.info("✅ Indekslar tekshirildi (status, followed_at)")
+            except Exception as idx_err:
+                logger.warning(f"⚠️ Indeks yaratishda xato: {idx_err}")
+                
             # Targets jadvali (Follow qilish uchun targetlar)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS targets (
