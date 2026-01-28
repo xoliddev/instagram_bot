@@ -1414,10 +1414,13 @@ class InstagramBrowserBot:
             except:
                 pass
     
-    def _restart_story_viewing(self) -> bool:
+    def _restart_story_viewing(self, skip_first: bool = True) -> bool:
         """
         Storylarni qayta boshlash uchun helper funksiya.
         Home sahifaga o'tib, story ringlarni topib, boshlaydi.
+        
+        Args:
+            skip_first: True bo'lsa birinchi storyni o'tkazib yuboradi (qotib qolgan bo'lishi mumkin)
         
         Returns:
             True agar muvaffaqiyatli boshlangan bo'lsa, False aks holda
@@ -1434,8 +1437,22 @@ class InstagramBrowserBot:
             
             if ring_count > 1:
                 logger.info(f"🔄 {ring_count} ta story (canvas) topildi. Qayta boshlanmoqda...")
-                story_rings.nth(1).click()  # 1-chi = "Add Story", 2-chi = do'st story
+                
+                # Tasodifiy story tanlash (birinchisini o'tkazib yuborish)
+                # 1-chi = "Add Story", 2-chi = birinchi do'st story
+                # Agar skip_first True bo'lsa va 3+ story bo'lsa - 3-chidan boshlaymiz
+                if skip_first and ring_count > 2:
+                    # O'rtadagi yoki oxiridagi storyni tasodifiy tanlash
+                    start_idx = min(2, ring_count - 1)  # Kamida 2-chi (3-chi canvas)
+                    end_idx = min(ring_count - 1, 5)  # Maksimum 5-chi
+                    selected_idx = random.randint(start_idx, end_idx) if start_idx < end_idx else start_idx
+                    logger.info(f"🎲 Tasodifiy story tanlandi: #{selected_idx + 1}/{ring_count}")
+                    story_rings.nth(selected_idx).click()
+                else:
+                    story_rings.nth(1).click()  # Standart: 2-chi canvas
+                
                 time.sleep(3)  # Story ochilishini kutish
+                
                 # URL ni tekshirish - story ochilganmi?
                 if "instagram.com/stories" in self.page.url:
                     logger.info("✅ Story ochildi!")
@@ -1541,6 +1558,9 @@ class InstagramBrowserBot:
             # 3. Loop: Story ko'rish va like bosish
             same_user_count = 0  # Bir xil user takrorlanish hisoblagichi
             last_user = None  # Oldingi ko'rilgan user
+            stuck_users = set()  # Qotib qolgan userlar ro'yxati
+            total_stuck_retries = 0  # Umumiy qayta urinishlar soni
+            max_total_stuck_retries = 15  # Maksimal qayta urinishlar
             
             while (time.time() - start_time) < duration:
                 # Qancha vaqt qoldi?
@@ -1584,21 +1604,70 @@ class InstagramBrowserBot:
                 if current_username == last_user:
                     same_user_count += 1
                     if same_user_count >= 5:
+                        # Bu userni qotib qolganlar ro'yxatiga qo'shamiz
+                        if current_username != "Noma'lum":
+                            stuck_users.add(current_username)
+                        
                         remaining = duration - (time.time() - start_time)
+                        total_stuck_retries += 1
+                        
+                        # Agar juda ko'p marta qotib qolsa - chiqish
+                        if total_stuck_retries >= max_total_stuck_retries:
+                            logger.warning(f"⚠️ Juda ko'p qotib qolish ({total_stuck_retries} marta). Story ko'rishdan chiqilmoqda...")
+                            break
+                        
                         if remaining > 30:
-                            logger.warning(f"⚠️ Story qotib qoldi ({current_username} 5+ marta). Qayta boshlanmoqda...")
-                            self.refresh_page_if_stuck()
-                            time.sleep(2)
-                            # Qayta story ochish
-                            if self._restart_story_viewing():
-                                same_user_count = 0
-                                last_user = None
-                                continue  # Loop davom etadi
-                        logger.warning(f"⚠️ Story qotib qoldi. Chiqilmoqda...")
-                        break
+                            logger.warning(f"⚠️ Story qotib qoldi ({current_username} 5+ marta). Skip qilinmoqda...")
+                            
+                            # Usul 1: Keyingi userga o'tish uchun ko'p marta ArrowRight bosish
+                            skip_success = False
+                            for skip_attempt in range(10):  # 10 marta urinish
+                                try:
+                                    self.page.keyboard.press("ArrowRight")
+                                    time.sleep(0.5)
+                                    
+                                    # Yangi URL tekshirish
+                                    new_url = self.page.url
+                                    new_match = re.search(r"stories/([^/]+)/", new_url)
+                                    if new_match:
+                                        new_username = new_match.group(1)
+                                        # Agar boshqa userga o'tgan bo'lsak va u stuck emas
+                                        if new_username != current_username and new_username not in stuck_users:
+                                            logger.info(f"✅ Keyingi userga o'tildi: @{new_username}")
+                                            skip_success = True
+                                            same_user_count = 0
+                                            last_user = new_username
+                                            break
+                                except:
+                                    pass
+                            
+                            # Agar ArrowRight ishlamasa - sahifani yangilash va qayta boshlash
+                            if not skip_success:
+                                logger.info("🔄 ArrowRight ishlamadi. Sahifa yangilanmoqda...")
+                                self.refresh_page_if_stuck()
+                                time.sleep(2)
+                                # Qayta story ochish
+                                if self._restart_story_viewing():
+                                    same_user_count = 0
+                                    last_user = None
+                                    continue  # Loop davom etadi
+                        else:
+                            logger.warning(f"⚠️ Story qotib qoldi. Chiqilmoqda...")
+                            break
                 else:
                     same_user_count = 0
                     last_user = current_username
+                
+                # Agar hozirgi user stuck_users ro'yxatida bo'lsa - skip qilish
+                if current_username in stuck_users:
+                    logger.info(f"⏭️ @{current_username} avval qotib qolgan edi. Skip qilinmoqda...")
+                    try:
+                        for _ in range(5):  # 5 marta ArrowRight
+                            self.page.keyboard.press("ArrowRight")
+                            time.sleep(0.3)
+                    except:
+                        pass
+                    continue
 
                 logger.info(f"👀 Story ko'rilmoqda: @{current_username} ({watch_time}s)")
                 
@@ -1706,22 +1775,36 @@ class InstagramBrowserBot:
                 
                 # Keyingi storyga o'tish (Next tugmasi yoki Keyboard Right)
                 try:
-                    # 1. Keyboard Right (2 marta - ishonchli)
-                    self.page.keyboard.press("ArrowRight")
-                    time.sleep(0.3)
+                    old_url = self.page.url
                     
-                    # 2. Agar o'tmasa - ekranning o'ng tomonini bosish
-                    try:
-                        # Viewport o'lchamlarini olish
-                        viewport = self.page.viewport_size
-                        if viewport:
-                            # O'ng tomon - markazdan o'ngda
-                            x = int(viewport['width'] * 0.85)
-                            y = int(viewport['height'] * 0.5)
-                            self.page.mouse.click(x, y)
+                    # 1. Keyboard Right (3 marta - ishonchli)
+                    for _ in range(3):
+                        self.page.keyboard.press("ArrowRight")
+                        time.sleep(0.2)
+                    
+                    # URL o'zgarganmi tekshirish (yangi storyga o'tishni kutish)
+                    time.sleep(0.5)
+                    new_url = self.page.url
+                    
+                    # Agar URL o'zgarmagan bo'lsa - qo'shimcha usullar
+                    if new_url == old_url:
+                        # 2. Ekranning o'ng tomonini bosish
+                        try:
+                            viewport = self.page.viewport_size
+                            if viewport:
+                                x = int(viewport['width'] * 0.9)  # O'ng chekkaga yaqinroq
+                                y = int(viewport['height'] * 0.5)
+                                self.page.mouse.click(x, y)
+                                time.sleep(0.5)
+                        except:
+                            pass
+                        
+                        # 3. Space tugmasini bosish (ba'zi hollarda ishlaydi)
+                        try:
+                            self.page.keyboard.press("Space")
                             time.sleep(0.3)
-                    except:
-                        pass
+                        except:
+                            pass
                 except:
                     break
                     
