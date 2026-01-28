@@ -640,6 +640,13 @@ class InstagramBrowserBot:
                             "X-CSRFToken": csrftoken
                         }}
                     }});
+                    
+                    if (!resp.headers.get("content-type")?.includes("application/json")) {{
+                         const text = await resp.text();
+                         if (text.includes("login")) return {{ success: false, error: "Login Required (Redirect)" }};
+                         return {{ success: false, error: "Non-JSON Response (Challenge/Error)" }};
+                    }}
+
                     const json = await resp.json();
                     if (json.status === "ok" || json.result === "following") {{
                         return {{ success: true }};
@@ -675,6 +682,11 @@ class InstagramBrowserBot:
                             "X-CSRFToken": csrftoken
                         }}
                     }});
+
+                    if (!resp.headers.get("content-type")?.includes("application/json")) {{
+                         return {{ success: false, error: "Non-JSON Response (Challenge/Error)" }};
+                    }}
+
                     const json = await resp.json();
                     if (json.status === "ok") {{
                         return {{ success: true }};
