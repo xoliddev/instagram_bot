@@ -1814,8 +1814,6 @@ class InstagramBrowserBot:
                         pass
                 except:
                     break
-                except:
-                    break
                     
                 # Agar storylar tugagan bo'lsa - qayta boshlash (vaqt qolsa)
                 current_url = self.page.url
