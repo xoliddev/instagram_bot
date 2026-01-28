@@ -86,14 +86,35 @@ class InstagramBrowserBot:
                     return False
         return False
     
-    def refresh_page_if_stuck(self) -> bool:
-        """Sahifa qotib qolsa yangilash"""
+    def restart_browser_full(self):
+        """Brauzerni butunlay o'chirib qayta yoqish"""
+        logger.warning("🔄 Brauzer to'liq restart qilinmoqda...")
         try:
-            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=15000)
+            self.close()
+            time.sleep(5)
+            if self.start_browser():
+                self.login()
+                logger.info("✅ Brauzer restart qilindi")
+            else:
+                logger.error("❌ Brauzer restart qilmadi")
+        except Exception as e:
+            logger.error(f"❌ Restart xatosi: {e}")
+
+    def refresh_page_if_stuck(self) -> bool:
+        """
+        Sahifa qotib qolsa yangilash. 
+        Agar yangilash o'xshamasa -> Full Restart
+        """
+        try:
+            logger.info("🔄 Sahifa yangilanmoqda (60s timeout)...")
+            # Reload o'rniga goto home (ishonchliroq)
+            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
             time.sleep(2)
             return True
-        except:
-            logger.warning("⚠️ Instagram asosiy sahifasi yuklanmadi")
+        except Exception as e:
+            logger.warning(f"⚠️ Sahifa yangilashda xato: {e}")
+            # Agar oddiy reload o'xshamasa - Full Restart
+            self.restart_browser_full()
             return False
 
     def start_browser(self) -> bool:
@@ -607,9 +628,9 @@ class InstagramBrowserBot:
                 
                 logger.info(f"🔍 Profilga kirilmoqda: @{username} (Urinish: {attempt+1}/{max_retries})")
                 
-                # Profilga o'tish (45s Timeout - commit = tezroq)
+                # Profilga o'tish (90s Timeout - commit = tezroq)
                 try:
-                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=45000)
+                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=90000)
                     # Qo'shimcha: DOM yuklanganliqini kutish (10s max)
                     try:
                         self.page.wait_for_load_state("domcontentloaded", timeout=10000)
