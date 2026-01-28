@@ -459,3 +459,28 @@ def get_status_counts() -> dict:
     except Exception as e:
         logger.error(f"❌ DB Get status counts error: {e}")
         return {'pending': 0, 'waiting': 0, 'followed_back': 0, 'unfollowed': 0, 'blocked': 0, 'total': 0}
+
+def update_today_stats(follow=0, unfollow=0):
+    """Bugungi statistikani yangilash (+1)"""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            date_str = datetime.now().date().isoformat()
+            
+            if follow > 0:
+                cursor.execute("""
+                    INSERT INTO daily_stats (date, follow_count, unfollow_count)
+                    VALUES (?, 1, 0)
+                    ON CONFLICT(date) DO UPDATE SET follow_count = follow_count + 1
+                """, (date_str,))
+                
+            if unfollow > 0:
+                cursor.execute("""
+                    INSERT INTO daily_stats (date, follow_count, unfollow_count)
+                    VALUES (?, 0, 1)
+                    ON CONFLICT(date) DO UPDATE SET unfollow_count = unfollow_count + 1
+                """, (date_str,))
+            
+            conn.commit()
+    except Exception as e:
+        logger.error(f"❌ DB Update stats error: {e}")
