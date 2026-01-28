@@ -1600,10 +1600,10 @@ class InstagramBrowserBot:
                     
                     time.sleep(0.5) # URL yangilanishini kutish
 
-                # STUCK DETECTION: Agar bir xil user 5+ marta ko'rinsa, story qotib qolgan
+                # STUCK DETECTION: Agar bir xil user 3+ marta ko'rinsa, story qotib qolgan
                 if current_username == last_user:
                     same_user_count += 1
-                    if same_user_count >= 5:
+                    if same_user_count >= 3:
                         # Bu userni qotib qolganlar ro'yxatiga qo'shamiz
                         if current_username != "Noma'lum":
                             stuck_users.add(current_username)
@@ -1617,7 +1617,7 @@ class InstagramBrowserBot:
                             break
                         
                         if remaining > 30:
-                            logger.warning(f"⚠️ Story qotib qoldi ({current_username} 5+ marta). Skip qilinmoqda...")
+                            logger.warning(f"⚠️ Story qotib qoldi ({current_username} 3+ marta). Skip qilinmoqda...")
                             
                             # Usul 1: Keyingi userga o'tish uchun ko'p marta ArrowRight bosish
                             skip_success = False
@@ -1773,38 +1773,47 @@ class InstagramBrowserBot:
                     except Exception as e:
                         logger.error(f"Like Error: {e}")
                 
-                # Keyingi storyga o'tish (Next tugmasi yoki Keyboard Right)
+                # Keyingi storyga o'tish (Next tugmasi, Keyboard Right, yoki Ekranni bosish)
                 try:
                     old_url = self.page.url
+                    # 1. Aniq Next tugmasini qidirish (Eng ishonchli)
+                    next_btns = self.page.locator('svg[aria-label="Next"], svg[aria-label="Right chevron"], svg[aria-label="Keyingisi"]')
+                    if next_btns.count() > 0:
+                        for i in range(next_btns.count()):
+                            btn = next_btns.nth(i)
+                            if btn.is_visible():
+                                try:
+                                    btn.locator("..").click(force=True) # Parent button click
+                                    time.sleep(0.5)
+                                    break
+                                except:
+                                    pass
                     
-                    # 1. Keyboard Right (3 marta - ishonchli)
+                    # URL o'zgarganmi tekshirish
+                    if self.page.url != old_url:
+                        continue
+                    
+                    # 2. Keyboard Right (3 marta)
                     for _ in range(3):
                         self.page.keyboard.press("ArrowRight")
                         time.sleep(0.2)
                     
-                    # URL o'zgarganmi tekshirish (yangi storyga o'tishni kutish)
-                    time.sleep(0.5)
-                    new_url = self.page.url
-                    
-                    # Agar URL o'zgarmagan bo'lsa - qo'shimcha usullar
-                    if new_url == old_url:
-                        # 2. Ekranning o'ng tomonini bosish
-                        try:
-                            viewport = self.page.viewport_size
-                            if viewport:
-                                x = int(viewport['width'] * 0.9)  # O'ng chekkaga yaqinroq
-                                y = int(viewport['height'] * 0.5)
-                                self.page.mouse.click(x, y)
-                                time.sleep(0.5)
-                        except:
-                            pass
-                        
-                        # 3. Space tugmasini bosish (ba'zi hollarda ishlaydi)
-                        try:
-                            self.page.keyboard.press("Space")
-                            time.sleep(0.3)
-                        except:
-                            pass
+                    if self.page.url != old_url:
+                        continue
+
+                    # 3. Ekranning o'ng tomonini bosish (Mouse Click)
+                    try:
+                        viewport = self.page.viewport_size
+                        if viewport:
+                            # O'ng tomon (95% o'ngda - dead zone dan qochish uchun)
+                            x = int(viewport['width'] * 0.95)
+                            y = int(viewport['height'] * 0.5)
+                            self.page.mouse.click(x, y)
+                            time.sleep(0.5)
+                    except:
+                        pass
+                except:
+                    break
                 except:
                     break
                     
