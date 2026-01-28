@@ -71,7 +71,7 @@ class InstagramBrowserBot:
         except:
             pass
     
-    def safe_goto(self, url: str, timeout: int = 20000, retries: int = 2) -> bool:
+    def safe_goto(self, url: str, timeout: int = 45000, retries: int = 2) -> bool:
         """Xavfsiz sahifaga o'tish - timeout va retry bilan"""
         for attempt in range(retries):
             try:
@@ -80,7 +80,7 @@ class InstagramBrowserBot:
             except Exception as e:
                 if attempt < retries - 1:
                     logger.warning(f"⚠️ Sahifa yuklanmadi ({attempt+1}/{retries}): {url[:50]}...")
-                    time.sleep(3)
+                    time.sleep(5)
                 else:
                     logger.error(f"❌ Sahifa yuklanmadi: {url[:50]}... - {str(e)[:50]}")
                     return False
@@ -127,6 +127,17 @@ class InstagramBrowserBot:
             
             self.page = self.context.new_page()
             self.page.set_default_timeout(60000) # 60 sekund timeout
+            
+            # --- RESOURCE BLOCKING (Tezlashtirish) ---
+            # Rasmlar, fontlar va media fayllarni bloklash
+            try:
+                self.page.route("**/*", lambda route: route.abort() 
+                    if route.request.resource_type in ["image", "media", "font"] 
+                    else route.continue_())
+                logger.info("⚡ Resource blocking yoqildi (Imagelar bloklandi)")
+            except Exception as e:
+                logger.warning(f"⚠️ Resource blocking xatosi: {e}")
+            
             logger.info("✅ Brauzer tayyor")
             return True
             
@@ -140,8 +151,8 @@ class InstagramBrowserBot:
         
         # Instagram'ga o'tish
         try:
-            logger.info("loading... (30s timeout)")
-            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=30000)
+            logger.info("loading... (60s timeout)")
+            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
             logger.info("✅ Sayt yuklandi (yoki timeout)")
         except Exception as e:
             logger.warning(f"⚠️ Navigatsiya xatosi: {e}")
@@ -596,12 +607,12 @@ class InstagramBrowserBot:
                 
                 logger.info(f"🔍 Profilga kirilmoqda: @{username} (Urinish: {attempt+1}/{max_retries})")
                 
-                # Profilga o'tish (12s Timeout - commit = tezroq)
+                # Profilga o'tish (45s Timeout - commit = tezroq)
                 try:
-                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=12000)
-                    # Qo'shimcha: DOM yuklanganliqini kutish (3s max)
+                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=45000)
+                    # Qo'shimcha: DOM yuklanganliqini kutish (10s max)
                     try:
-                        self.page.wait_for_load_state("domcontentloaded", timeout=3000)
+                        self.page.wait_for_load_state("domcontentloaded", timeout=10000)
                     except:
                         pass
                     self.consecutive_timeouts = 0  # Muvaffaqiyatli - reset
@@ -1197,9 +1208,9 @@ class InstagramBrowserBot:
         
         try:
             logger.info(f"⏳ Profilga o'tilmoqda: @{username}")
-            # 1. Profilga o'tish (Timeout 30s ga kamaytirildi)
+            # 1. Profilga o'tish (Timeout 45s ga oshirildi)
             try:
-                self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=15000)
+                self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=45000)
                 time.sleep(2)
                 
                 # 1.5 TEZKOR TEKSHIRUV: Balki allaqachon unfollow qilingandir?
@@ -1891,6 +1902,7 @@ class InstagramBrowserBot:
                     iterations = 0
                     
                     while (time.time() - sub_start) < remaining and iterations < max_iterations:
+                        self.update_heartbeat()
                         iterations += 1
                         try:
                             # Vaqtni yangilash
