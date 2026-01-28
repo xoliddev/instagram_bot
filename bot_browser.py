@@ -1691,8 +1691,8 @@ class InstagramBrowserBot:
 
                 time.sleep(watch_time)
                 
-                # Random Like (100% ehtimol - Test uchun)
-                if random.random() < 1.0:
+                # Random Like (85% ehtimol - Human-like)
+                if random.random() < 0.85:
                     try:
                         # 1. AVVAL TEKSHIRAMIZ: Allaqaqchon like bosilganmi?
                         # Unlike tugmasini qidirish (Barchasini tekshiramiz)
