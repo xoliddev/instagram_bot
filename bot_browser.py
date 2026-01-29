@@ -309,6 +309,12 @@ class InstagramBrowserBot:
     def _get_target_user_id(self, target: str):
         """Target username dan user ID olish"""
         try:
+            # 1. API orqali (Navigatsiyasiz - Tez)
+            user_id = self._get_user_id_via_api(target)
+            if user_id:
+                return user_id
+
+            logger.info("⚠️ API ID olinmadi, Browser orqali urinib ko'ramiz...")
             self.page.goto(f"https://www.instagram.com/{target}/", wait_until="domcontentloaded", timeout=30000)
             time.sleep(3)
             
@@ -2228,6 +2234,15 @@ class InstagramBrowserBot:
     def _get_my_user_id(self):
         """O'z user ID ni olish"""
         try:
+            # 0. Cookie dan olish (Eng tez - 0ms)
+            try:
+                cookies = self.context.cookies()
+                for cookie in cookies:
+                    if cookie['name'] == 'ds_user_id':
+                        return cookie['value']
+            except:
+                pass
+
             self.page.goto(f"https://www.instagram.com/{config.INSTAGRAM_USERNAME}/", wait_until="domcontentloaded", timeout=30000)
             time.sleep(3)
             
