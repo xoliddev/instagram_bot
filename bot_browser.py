@@ -710,20 +710,11 @@ class InstagramBrowserBot:
             logger.warning(f"⚠️ Kunlik limit tugadi ({daily_follow})")
             return False
             
-        # 1. API orqali urinib ko'rish (ENG TEZ - NAVIGATSIYASIZ)
-        try:
-            user_id = self._get_user_id_via_api(username)
-            if user_id:
-                api_res = self._follow_via_api(user_id)
-                if api_res.get('success'):
-                    logger.info(f"⚡ API orqali follow qilindi: @{username}")
-                    database.update_status(username, 'waiting')
-                    database.update_today_stats(follow=1)
-                    return True
-                else:
-                    logger.warning(f"⚠️ API follow o'xshamadi @{username}: {api_res.get('error')}, browser fallback...")
-        except Exception as api_err:
-             logger.warning(f"⚠️ API Error: {api_err}")
+        # 1. API orqali urinib ko'rish (O'CHIRILDI - XAVFLI)
+        # user_id = self._get_user_id_via_api(username)
+        # ...
+        
+        # 2. BROWSER UI (XAVFSIZ USUL) - Asosiy rejim
 
         # 2. BROWSER FALLBACK (Eski usul)
         
@@ -1348,19 +1339,8 @@ class InstagramBrowserBot:
             logger.warning(f"⚠️ Kunlik unfollow limiti tugadi")
             return False
         
-        # 1. API orqali urinib ko'rish (ENG TEZ - NAVIGATSIYASIZ)
-        try:
-            user_id = self._get_user_id_via_api(username)
-            if user_id:
-                api_res = self._unfollow_via_api(user_id)
-                if api_res.get('success'):
-                    logger.info(f"⚡ API orqali unfollow qilindi: @{username}")
-                    database.update_status(username, 'unfollowed')
-                    return True
-                else:
-                    logger.warning(f"⚠️ API unfollow o'xshamadi @{username}: {api_res.get('error')}, browser fallback...")
-        except Exception as api_err:
-             logger.warning(f"⚠️ API Error (Unfollow): {api_err}")
+        # 1. API orqali urinib ko'rish (O'CHIRILDI - XAVFLI)
+        # ...
 
         try:
             logger.info(f"⏳ Profilga o'tilmoqda: @{username}")
