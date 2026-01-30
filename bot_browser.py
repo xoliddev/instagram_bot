@@ -172,14 +172,38 @@ class InstagramBrowserBot:
         logger.info("🔐 Instagram tekshirilmoqda...")
         
         try:
+            # Clear stuck navigation
+            if self.page.url != "about:blank":
+                try:
+                    self.page.goto("about:blank")
+                    time.sleep(1)
+                except:
+                    pass
+
             logger.info("loading... (60s timeout)")
-            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
+            try:
+                self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
+            except Exception as goto_err:
+                try:
+                    title = self.page.title()
+                    if "Instagram" in title:
+                         logger.info(f"⚠️ Timeout bo'ldi, lekin sahifa yuklanganga o'xshaydi: {title}")
+                    else:
+                         raise goto_err
+                except:
+                    raise goto_err
+
             logger.info("✅ Sayt yuklandi (yoki timeout)")
+            
+            # Qo'shimcha kutish (resurslar yuklanishi uchun)
+            time.sleep(random.uniform(3, 5))
+            
         except Exception as e:
             logger.warning(f"⚠️ Navigatsiya xatosi: {e}")
-            self.page.screenshot(path="error_nav.png")
-            
-        time.sleep(3)
+            try:
+                self.page.screenshot(path="error_nav.png")
+            except:
+                pass
         
         logger.info("🔍 Login holati tekshirilmoqda...")
         if self._is_logged_in():
