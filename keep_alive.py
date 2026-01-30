@@ -10,7 +10,10 @@ def home():
 
 def run():
   port = int(os.environ.get("PORT", 8000))
-  app.run(host='0.0.0.0', port=port)
+  try:
+      app.run(host='0.0.0.0', port=port)
+  except Exception as e:
+      print(f"⚠️ Web server error (Port {port}): {e}")
 
 def keep_alive():
     t = Thread(target=run)

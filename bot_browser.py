@@ -115,6 +115,36 @@ class InstagramBrowserBot:
         except Exception as e:
             logger.error(f"❌ Brauzer xatosi: {e}")
             return False
+
+    def close(self):
+        """Brauzerni yopish"""
+        logger.info("❌ Brauzer yopilmoqda...")
+        try:
+            if self.page:
+                try:
+                    self.page.close()
+                except:
+                    pass
+            if self.context:
+                try:
+                    self.context.close()
+                except:
+                    pass
+            if self.playwright:
+                try:
+                    self.playwright.stop()
+                except:
+                    pass
+        except Exception as e:
+            logger.warning(f"⚠️ Brauzer yopishda xato: {e}")
+        finally:
+            self.page = None
+            self.context = None
+            self.playwright = None
+            self.api = None
+            self.actions = None
+            self.stories = None
+            self.sync = None
     
     def _init_modules(self):
         """Sub-modullarni ishga tushirish"""
