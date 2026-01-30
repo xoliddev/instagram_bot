@@ -33,23 +33,34 @@ class InstagramStories:
             # 1. Home sahifaga o'tish
             if self.page.url != "about:blank":
                 try:
-                    self.page.goto("about:blank")
+                    logger.info("🧹 Cache tozalash (about:blank)...")
+                    self.page.goto("about:blank", timeout=5000)
                     time.sleep(1)
                 except:
                     pass
 
             try:
-                self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
+                logger.info("🏠 Bosh sahifa yuklanmoqda...")
+                self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=60000)
             except Exception as goto_err:
                 try:
                     title = self.page.title()
                     if "Instagram" in title:
-                         logger.info(f"⚠️ Timeout bo'ldi, lekin sahifa yuklanganga o'xshaydi: {title}")
+                         logger.info(f"⚠️ Timeout, lekin Title OK: {title}")
                     else:
                          raise goto_err
                 except:
                     raise goto_err
-            time.sleep(5)
+            
+            # Elementlarni kutish (Smart wait)
+            logger.info("⏳ Elementlar kutilmoqda...")
+            try:
+                 # Canvas yoki Story tugmasini kutish (10s)
+                 self.page.locator("canvas, div[role='button']").first.wait_for(state="attached", timeout=10000)
+            except:
+                 pass
+                 
+            time.sleep(2)
             
             # 2. Story ringlarni topish
             story_rings = self.page.locator('canvas')
