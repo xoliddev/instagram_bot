@@ -66,6 +66,9 @@ class InstagramActions:
                     except:
                         pass
                 
+                # Update Heartbeat
+                update_heartbeat()
+                
                 # Profilga o'tish (60s Timeout + Wait)
                 try:
                     # wait_until="domcontentloaded" is better for profiles
@@ -92,12 +95,26 @@ class InstagramActions:
                             return False
 
                 time.sleep(random.uniform(1, 2))
+                update_heartbeat()
                 
                 # Follow tugmasini qidirish (5s timeout bilan)
                 try:
-                    follow_btn = self.page.locator('button:has-text("Follow")').first
-                    follow_btn.wait_for(state="visible", timeout=5000)
-                    follow_visible = True
+                    # Kengaytirilgan qidiruv (Rus, O'zbek, Turk, Ingliz)
+                    follow_btn = self.page.locator('button').filter(
+                        has_text=re.compile(r"Follow|Obuna bo'lish|Подписаться|Takip et", re.IGNORECASE)
+                    ).first
+                    
+                    if follow_btn.is_visible(timeout=5000):
+                        follow_visible = True
+                    else:
+                         # 2-urinish: Aniqroq selector
+                        follow_btn = self.page.locator('header button').filter(
+                            has_text=re.compile(r"Follow|Obuna bo'lish|Подписаться|Takip et", re.IGNORECASE)
+                        ).first
+                        if follow_btn.is_visible(timeout=2000):
+                            follow_visible = True
+                        else:
+                            follow_visible = False
                 except:
                     follow_visible = False
                 
@@ -106,9 +123,13 @@ class InstagramActions:
                     # Allaqachon follow qilinganmi?
                     already_followed = False
                     try:
-                        combined_selector = 'button:has-text("Following"), button:has-text("Requested"), div:has-text("Message")'
-                        self.page.locator(combined_selector).first.wait_for(state="visible", timeout=3000)
-                        already_followed = True
+                        combined_selector = 'button:has-text("Following"), button:has-text("Requested"), button:has-text("Obuna bo\'lingan"), button:has-text("So\'rov yuborilgan"), button:has-text("Подписки"), button:has-text("Запрос")'
+                        if self.page.locator(combined_selector).first.is_visible(timeout=3000):
+                            already_followed = True
+                        elif self.page.locator('div:has-text("Message")').first.is_visible(timeout=1000):
+                             # Message tugmasi bor, demak follow qilingan bo'lishi mumkin (yoki open profil)
+                             # Lekin Follow tugmasi yo'q, demak follow qilingan
+                             already_followed = True
                     except:
                         pass
                     
@@ -121,17 +142,19 @@ class InstagramActions:
                     return False
                 
                 # Follow bosish
+                update_heartbeat()
                 follow_btn.click()
                 time.sleep(2)
 
                 # "Pending" popup tekshiruvi (Private accountlar)
                 try:
-                    pending_dialog = self.page.locator('div[role="dialog"]:has-text("pending")')
-                    if pending_dialog.is_visible():
-                        ok_btn = pending_dialog.locator('button:has-text("OK")')
-                        if ok_btn.is_visible():
-                            ok_btn.click()
-                            time.sleep(1)
+                    pending_dialog = self.page.locator('div[role="dialog"]')
+                    if pending_dialog.is_visible(timeout=2000):
+                        if "pending" in pending_dialog.inner_text().lower():
+                             ok_btn = pending_dialog.locator('button').last
+                             if ok_btn.is_visible():
+                                 ok_btn.click()
+                                 time.sleep(1)
                 except:
                     pass
                 
