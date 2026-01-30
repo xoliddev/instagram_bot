@@ -38,7 +38,17 @@ class InstagramStories:
                 except:
                     pass
 
-            self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
+            try:
+                self.page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=60000)
+            except Exception as goto_err:
+                try:
+                    title = self.page.title()
+                    if "Instagram" in title:
+                         logger.info(f"⚠️ Timeout bo'ldi, lekin sahifa yuklanganga o'xshaydi: {title}")
+                    else:
+                         raise goto_err
+                except:
+                    raise goto_err
             time.sleep(5)
             
             # 2. Story ringlarni topish
