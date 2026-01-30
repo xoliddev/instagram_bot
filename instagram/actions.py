@@ -59,7 +59,7 @@ class InstagramActions:
                 logger.info(f"🔍 Profilga kirilmoqda: @{username} (Urinish: {attempt+1}/{max_retries})")
                 
                 # Clear stuck navigation
-                if attempt > 0:
+                if attempt > 0 or self.page.url != "about:blank":
                     try:
                         self.page.goto("about:blank")
                         time.sleep(1)
