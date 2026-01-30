@@ -415,9 +415,14 @@ def main():
         # Server startda followerlarni sinxronlash
         bot.sync_my_followers()
         
-        # Auto rejimga qaytarish
-        database.set_config("current_cycle", "auto")
-        database.set_config("strict_mode", "false")
+        # State tiklash (Agar oldin biror ish qilayotgan bo'lsa, davom ettiradi)
+        saved_cycle = database.get_config("current_cycle")
+        if saved_cycle and saved_cycle != "auto":
+             logger.info(f"🔄 Oldingi holat tiklandi: {saved_cycle}")
+        else:
+             logger.info("🔄 Auto rejimga o'tilmoqda")
+             database.set_config("current_cycle", "auto")
+             database.set_config("strict_mode", "false")
         
         last_sync_time = datetime.now()
         
