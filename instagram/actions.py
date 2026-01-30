@@ -488,7 +488,7 @@ class InstagramActions:
             
             for i, username in enumerate(non_followers):
                 if database.get_config("current_cycle", "auto") != 'cleanup':
-                    logger.info("⚡ Cleanup to'xtatildi (yangi buyruq)")
+                    logger.info(f"⚡ Cleanup to'xtatildi (Yangi buyruq: {database.get_config('current_cycle')})")
                     break
                 
                 if unfollow_count >= limit:
@@ -508,7 +508,11 @@ class InstagramActions:
                             except:
                                 pass
                         
-                        time.sleep(random.uniform(5, 10))
+                        delay = get_human_delay(config.UNFOLLOW_DELAY_MIN, config.UNFOLLOW_DELAY_MAX)
+                        logger.info(f"⏳ Odam kabi kutilmoqda: {delay}s...")
+                        time.sleep(delay)
+                    else:
+                         time.sleep(random.randint(10, 20))
                 
                 except Exception as e:
                     logger.error(f"❌ Xato @{username}: {e}")
