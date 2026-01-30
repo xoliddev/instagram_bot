@@ -317,12 +317,9 @@ async def cmd_unfollow(message: Message):
     if not is_admin(message.from_user.id):
         return
     
-    if database.get_config("current_cycle") == "cleanup":
-        await message.answer("⚠️ Bot allaqachon cleanup rejimida.")
-        return
-    
-    await message.answer("ℹ️ Unfollow avtomatik rejimda ishlaydi.\n\nBot har 24 soatda follow qaytarmaganlarni o'zi tozalaydi.\n\n🧹 Majburiy tozalash (Smart Cleanup) uchun: /cleanup")
-    database.set_config("current_cycle", "auto")
+    # User xohishi bo'yicha /unfollow endi /cleanup kabi ishlaydi
+    await message.answer("🧹 <b>Unfollow (Cleanup) boshlanmoqda...</b>\n\n<i>Avval faqat info edi, endi to'g'ridan-to'g'ri tozalashga o'tadi.</i>")
+    await cmd_cleanup(message)
 
 @router.message(Command("cleanup"))
 async def cmd_cleanup(message: Message):    

@@ -499,6 +499,12 @@ class InstagramStories:
                     iterations = 0
                     
                     while (time.time() - sub_start) < remaining and iterations < max_iterations:
+                        # Buyruqni tekshirish (Loop ichida)
+                        current_cycle_check = database.get_config("current_cycle", "auto")
+                        if current_cycle_check != initial_cycle:
+                            logger.info(f"⚡ Story (sub-loop) to'xtatildi (Yangi buyruq: {current_cycle_check})")
+                            return # Butunlay chiqib ketish
+
                         update_heartbeat()
                         iterations += 1
                         
