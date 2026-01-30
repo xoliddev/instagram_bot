@@ -58,23 +58,38 @@ class InstagramActions:
                 
                 logger.info(f"🔍 Profilga kirilmoqda: @{username} (Urinish: {attempt+1}/{max_retries})")
                 
-                # Profilga o'tish (90s Timeout)
-                try:
-                    self.page.goto(f"https://www.instagram.com/{username}/", wait_until="commit", timeout=90000)
+                # Clear stuck navigation
+                if attempt > 0:
                     try:
-                        self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+                        self.page.goto("about:blank")
+                        time.sleep(1)
                     except:
                         pass
+                
+                # Profilga o'tish (60s Timeout + Wait)
+                try:
+                    # wait_until="domcontentloaded" is better for profiles
+                    self.page.goto(f"https://www.instagram.com/{username}/", timeout=60000)
                     self.consecutive_timeouts = 0
                 except Exception as goto_err:
-                    self.consecutive_timeouts += 1
-                    if attempt < max_retries - 1:
-                        logger.warning(f"⚠️ Timeout ({self.consecutive_timeouts}). 2s kutib qayta urinamiz...")
-                        time.sleep(2)
-                        continue
-                    else:
-                        logger.error(f"❌ Profil yuklanmadi @{username}: Timeout")
-                        return False
+                    # Timeout bo'lsa ham sahifa yuklangan bo'lishi mumkin
+                    # Title tekshiramiz
+                    try:
+                        title = self.page.title()
+                        if username in title or "Instagram" in title:
+                            logger.info(f"⚠️ Timeout bo'ldi, lekin sahifa yuklanganga o'xshaydi: {title}")
+                            self.consecutive_timeouts = 0
+                        else:
+                            raise goto_err
+                    except:
+                        self.consecutive_timeouts += 1
+                        if attempt < max_retries - 1:
+                            logger.warning(f"⚠️ Timeout ({self.consecutive_timeouts}). 2s kutib qayta urinamiz...")
+                            time.sleep(2)
+                            continue
+                        else:
+                            logger.error(f"❌ Profil yuklanmadi @{username}: Timeout")
+                            return False
 
                 time.sleep(random.uniform(1, 2))
                 

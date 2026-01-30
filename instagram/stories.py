@@ -31,7 +31,7 @@ class InstagramStories:
             update_heartbeat()
             
             # 1. Home sahifaga o'tish
-            self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=20000)
+            self.page.goto("https://www.instagram.com/", wait_until="commit", timeout=60000)
             time.sleep(3)
             
             # 2. Story ringlarni topish
