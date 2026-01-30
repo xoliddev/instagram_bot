@@ -384,38 +384,39 @@ class InstagramStories:
             if is_liked:
                 logger.info(f"ℹ️ {current_username}: Storyga allaqachon like bosilgan.")
             else:
-                like_selector = (
-                    'svg[aria-label*="Like"], '
-                    'svg[aria-label*="like"], '
-                    'svg[aria-label*="Нравится"], '
-                    'svg[aria-label*="Yoqtirish"], '
-                    'svg[aria-label*="Beğen"], '
-                    'svg[aria-label*="J\'aime"]'
-                )
-                
-                like_svgs = self.page.locator(like_selector)
-                count = like_svgs.count()
-                
-                for i in range(count):
-                    svg = like_svgs.nth(i)
-                    if svg.is_visible():
-                        try:
-                            like_btn = svg.locator("..")
-                            like_btn.click(force=True)
-                            clicked = True
-                            logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
-                            
-                            if "Noma'lum" in current_username:
-                                user_display = f"<i>{current_username}</i>"
-                            else:
-                                user_display = f"<a href='https://instagram.com/{current_username}'>@{current_username}</a>"
-                            
-                            send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> {user_display}")
-                            time.sleep(1)
-                            break
-                        except Exception as click_err:
-                            logger.warning(f"⚠️ Like tugmasini bosishda muammo: {click_err}")
-                            continue
+                # 1. Regex bilan qidirish (Kuchliroq)
+                try:
+                    like_btn = self.page.locator('svg').filter(
+                        has_text=re.compile(r"Like|Nravitsya|J'aime|Yoqtirish|Beğen|Нравится", re.IGNORECASE)
+                    ).first
+                    
+                    if not like_btn.is_visible():
+                         # 2. Aria-label bilan aniqroq qidirish
+                        like_selector = (
+                            'span svg[aria-label="Like"], '
+                            'span svg[aria-label="Нравится"], '
+                            'span svg[aria-label="Yoqtirish"]'
+                        )
+                        like_btn = self.page.locator(like_selector).first
+
+                    if like_btn.is_visible():
+                        like_btn.locator("..").click(force=True)
+                        clicked = True
+                        logger.info(f"{Fore.MAGENTA}❤️ Storyga Like bosildi!")
+                        
+                        if "Noma'lum" in current_username:
+                            user_display = f"<i>{current_username}</i>"
+                        else:
+                            user_display = f"<a href='https://instagram.com/{current_username}'>@{current_username}</a>"
+                        
+                        send_telegram_msg(f"❤️ <b>Storyga Like bosildi:</b> {user_display}")
+                        time.sleep(1)
+                    else:
+                        raise Exception("Like button not visible")
+                        
+                except Exception as click_err:
+                    # Agar like topilmasa, ehtimol bu reklama yoki like bosib bo'lmaydigan story
+                    pass
             
             if not clicked and not is_liked:
                 if not self.debug_sent:
